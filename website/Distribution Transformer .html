@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distribution Transformer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #report-section, #report-section * {
+        visibility: visible;
+      }
+      #report-section {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+      }
+      #report-section .print-button {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body className="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Initializing React root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+
+    // Insulation level lookup table for HV
+    const insulationLevels = {
+      1.11: { hvPowerFreq: 3, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: "N/A", lvImpulse: "-" },
+      3.6: { hvPowerFreq: 10, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 20, lvImpulse: "-" },
+      7.2: { hvPowerFreq: 20, lvPowerFreq: 3, hvInduced: 13.2, lvInduced: 0.866, hvImpulse: 60, lvImpulse: "-" },
+      12: { hvPowerFreq: 28, lvPowerFreq: 3, hvInduced: 22, lvInduced: 0.866, hvImpulse: 75, lvImpulse: "-" },
+      17.5: { hvPowerFreq: 38, lvPowerFreq: 3, hvInduced: 30, lvInduced: 0.866, hvImpulse: 95, lvImpulse: "-" },
+      24: { hvPowerFreq: 50, lvPowerFreq: 3, hvInduced: 44, lvInduced: 0.866, hvImpulse: 125, lvImpulse: "-" },
+      36: { hvPowerFreq: 70, lvPowerFreq: 3, hvInduced: 66, lvInduced: 0.866, hvImpulse: 170, lvImpulse: "-" },
+      72.5: { hvPowerFreq: 140, lvPowerFreq: 3, hvInduced: 132, lvInduced: 0.866, hvImpulse: 325, lvImpulse: "-" },
+      123: { hvPowerFreq: 185, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 450, lvImpulse: "-" },
+      145: { hvPowerFreq: 230, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 550, lvImpulse: "-" },
+      242: { hvPowerFreq: 395, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 950, lvImpulse: "-" },
+      420: { hvPowerFreq: 570, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 1300, lvImpulse: "-" },
+      420.1: { hvPowerFreq: 630, lvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", lvInduced: 0.866, hvImpulse: 1425, lvImpulse: "-" }
+    };
+
+    // Insulation level lookup table for LV
+    const lvInsulationLevels = {
+      0.433: { lvPowerFreq: 3, lvInduced: 0.866, lvImpulse: "-" },
+      2: { lvPowerFreq: 10, lvInduced: 4, lvImpulse: "20" }
+    };
+
+    // Maximum Total Losses lookup table (Updated as per IS 1180 Amendment No. 4 Table 6)
+    const maxTotalLosses = {
+      250: {
+        level1: { noLoad: 480, load50: 500, load100: 2450 },
+        level2: { noLoad: 450, load50: 470, load100: 2250 },
+        level3: { noLoad: 424, load50: 440, load100: 2064 },
+        level4: { noLoad: 398, load50: 413, load100: 1895 },
+        level5: { noLoad: 373, load50: 388, load100: 1740 }
+      },
+      315: {
+        level1: { noLoad: 525, load50: 500, load100: 2575 },
+        level2: { noLoad: 490, load50: 465, load100: 2260 },
+        level3: { noLoad: 460, load50: 430, load100: 1980 },
+        level4: { noLoad: 429, load50: 400, load100: 1735 },
+        level5: { noLoad: 400, load50: 372, load100: 1520 }
+      },
+      400: {
+        level1: { noLoad: 625, load50: 600, load100: 2825 },
+        level2: { noLoad: 590, load50: 560, load100: 2740 },
+        level3: { noLoad: 550, load50: 530, load100: 2664 },
+        level4: { noLoad: 513, load50: 500, load100: 2589 },
+        level5: { noLoad: 481, load50: 470, load100: 2513 }
+      },
+      500: {
+        level1: { noLoad: 760, load50: 750, load100: 3540 },
+        level2: { noLoad: 720, load50: 710, load100: 3380 },
+        level3: { noLoad: 684, load50: 670, load100: 3225 },
+        level4: { noLoad: 642, load50: 640, load100: 3085 },
+        level5: { noLoad: 605, load50: 610, load100: 2949 }
+      },
+      630: {
+        level1: { noLoad: 960, load50: 900, load100: 4340 },
+        level2: { noLoad: 895, load50: 850, load100: 3955 },
+        level3: { noLoad: 837, load50: 800, load100: 3601 },
+        level4: { noLoad: 786, load50: 750, load100: 3275 },
+        level5: { noLoad: 741, load50: 700, load100: 2976 }
+      },
+      800: {
+        level1: { noLoad: 1187, load50: 1100, load100: 5216 },
+        level2: { noLoad: 1117, load50: 1030, load100: 4721 },
+        level3: { noLoad: 1015, load50: 1000, load100: 4308 },
+        level4: { noLoad: 942, load50: 950, load100: 3911 },
+        level5: { noLoad: 876, load50: 900, load100: 3549 }
+      },
+      1000: {
+        level1: { noLoad: 1400, load50: 1390, load100: 6300 },
+        level2: { noLoad: 1320, load50: 1300, load100: 5680 },
+        level3: { noLoad: 1260, load50: 1200, load100: 5104 },
+        level4: { noLoad: 1160, load50: 1150, load100: 4625 },
+        level5: { noLoad: 1070, load50: 1100, load100: 4189 }
+      },
+      1250: {
+        level1: { noLoad: 1700, load50: 1600, load100: 7500 },
+        level2: { noLoad: 1600, load50: 1620, load100: 6800 },
+        level3: { noLoad: 1500, load50: 1642, load100: 6170 },
+        level4: { noLoad: 1370, load50: 1696, load100: 5633 },
+        level5: { noLoad: 1300, load50: 1691, load100: 5094 }
+      },
+      1600: {
+        level1: { noLoad: 2600, load50: 1600, load100: 9200 },
+        level2: { noLoad: 2450, load50: 1520, load100: 8850 },
+        level3: { noLoad: 2300, load50: 1453, load100: 8521 },
+        level4: { noLoad: 2150, load50: 1397, load100: 8213 },
+        level5: { noLoad: 2000, load50: 1353, load100: 7924 }
+      },
+      2000: {
+        level1: { noLoad: 3050, load50: 2000, load100: 11950 },
+        level2: { noLoad: 2890, load50: 1900, load100: 11210 },
+        level3: { noLoad: 2743, load50: 1800, load100: 10511 },
+        level4: { noLoad: 2569, load50: 1740, load100: 9890 },
+        level5: { noLoad: 2388, load50: 1700, load100: 9323 }
+      },
+      2500: {
+        level1: { noLoad: 3650, load50: 2500, load100: 14850 },
+        level2: { noLoad: 3500, load50: 2400, load100: 14000 },
+        level3: { noLoad: 3360, load50: 2300, load100: 13194 },
+        level4: { noLoad: 3130, load50: 2300, load100: 12529 },
+        level5: { noLoad: 2909, load50: 2300, load100: 11904 }
+      }
+    };
+
+    // Main App component
+    function App() {
+      const [formData, setFormData] = React.useState({
+        manufacturer: '',
+        customer: '',
+        service: 'Outdoor',
+        kva: '',
+        hvVoltage: '',
+        lvVoltage: '',
+        frequency: '50',
+        phases: '3',
+        hvConnection: 'Delta',
+        lvConnection: 'Star',
+        vectorGroup: 'Dyn11',
+        tapChangerType: '',
+        tapChangerMake: '',
+        tappingRange: '',
+        tapSteps: '',
+        coolingType: 'ONAN',
+        topOilTemp: '',
+        windingTemp: '',
+        impedanceVoltage: '',
+        insulationClass: '',
+        hvTerminal: 'Cable Box',
+        lvTerminal: 'Bus Duct',
+        paint: '',
+        referenceStandards: 'IS:1180',
+        energyEfficiencyLevel: 'level1',
+        hvCurrent: '',
+        lvCurrent: '',
+        noLoadLosses: '',
+        loadLosses: '',
+        maxLosses50: '',
+        maxLosses100: '',
+        hvPowerFreq: '',
+        lvPowerFreq: '',
+        hvInduced: '',
+        lvInduced: '',
+        hvImpulse: '',
+        lvImpulse: '',
+        efficiency100: '',
+        efficiency75: '',
+        efficiency50: '',
+        efficiency25: ''
+      });
+      const [showAdditionalDetails, setShowAdditionalDetails] = React.useState(false);
+      const [report, setReport] = React.useState(null);
+      const [error, setError] = React.useState('');
+
+      // Handling form input changes
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+      };
+
+      const handleCheckboxChange = (e) => {
+        setShowAdditionalDetails(e.target.checked);
+        // Reset additional details fields when checkbox is unchecked
+        if (!e.target.checked) {
+          setFormData(prev => ({
+            ...prev,
+            length: '',
+            width: '',
+            height: '',
+            coreWindingsWeight: '',
+            tankFittingsWeight: '',
+            oilMass: '',
+            totalWeight: ''
+          }));
+        }
+      };
+
+      // Function to trigger PDF download
+      const handleDownloadPDF = () => {
+        window.print();
+      };
+
+      // Validating and calculating transformer parameters
+      const calculateParameters = () => {
+        // Validate inputs
+        const errors = [];
+        if (!formData.manufacturer) errors.push('Please enter a manufacturer name.');
+        if (!formData.customer) errors.push('Please enter a customer name.');
+        if (!formData.kva || isNaN(parseFloat(formData.kva)) || parseFloat(formData.kva) <= 0) errors.push('Please enter a valid kVA rating (> 0).');
+        if (!formData.hvVoltage || isNaN(parseFloat(formData.hvVoltage)) || parseFloat(formData.hvVoltage) <= 0) errors.push('Please enter a valid HV voltage (> 0).');
+        if (!formData.lvVoltage || isNaN(parseFloat(formData.lvVoltage)) || parseFloat(formData.lvVoltage) <= 0) errors.push('Please enter a valid LV voltage (> 0).');
+        if (parseFloat(formData.hvVoltage) <= parseFloat(formData.lvVoltage)) errors.push('HV voltage must be greater than LV voltage.');
+        if (!formData.topOilTemp || isNaN(parseFloat(formData.topOilTemp)) || parseFloat(formData.topOilTemp) <= 0) errors.push('Please enter a valid oil temperature rise (> 0).');
+        if (!formData.windingTemp || isNaN(parseFloat(formData.windingTemp)) || parseFloat(formData.windingTemp) <= 0) errors.push('Please enter a valid winding temperature rise (> 0).');
+        if (!formData.tapChangerType) errors.push('Please select a tap changer type.');
+        if (!formData.tapChangerMake) errors.push('Please select a tap changer make.');
+        if (!formData.tappingRange) errors.push('Please enter a tapping range.');
+        if (!formData.tapSteps) errors.push('Please enter the number of steps/position.');
+        if (!formData.impedanceVoltage) errors.push('Please enter an impedance voltage.');
+        if (!formData.insulationClass) errors.push('Please enter an insulation class.');
+        if (!formData.paint) errors.push('Please enter a paint type and shade.');
+        if (!formData.referenceStandards) errors.push('Please select reference standards.');
+        if (!formData.noLoadLosses || isNaN(parseFloat(formData.noLoadLosses)) || parseFloat(formData.noLoadLosses) <= 0) errors.push('Please enter a valid no load losses (> 0).');
+        if (formData.referenceStandards === 'IS:2026' && (!formData.loadLosses || isNaN(parseFloat(formData.loadLosses)) || parseFloat(formData.loadLosses) <= 0)) {
+          errors.push('Please enter a valid load losses (> 0) for IS:2026.');
+        }
+
+        if (showAdditionalDetails) {
+          if (!formData.length || isNaN(parseFloat(formData.length)) || parseFloat(formData.length) <= 0) errors.push('Please enter a valid length (> 0).');
+          if (!formData.width || isNaN(parseFloat(formData.width)) || parseFloat(formData.width) <= 0) errors.push('Please enter a valid width (> 0).');
+          if (!formData.height || isNaN(parseFloat(formData.height)) || parseFloat(formData.height) <= 0) errors.push('Please enter a valid height (> 0).');
+          if (!formData.coreWindingsWeight || isNaN(parseFloat(formData.coreWindingsWeight)) || parseFloat(formData.coreWindingsWeight) <= 0) errors.push('Please enter a valid core & windings weight (> 0).');
+          if (!formData.tankFittingsWeight || isNaN(parseFloat(formData.tankFittingsWeight)) || parseFloat(formData.tankFittingsWeight) <= 0) errors.push('Please enter a valid tank & fittings weight (> 0).');
+          if (!formData.oilMass) errors.push('Please enter a valid oil mass.');
+          if (!formData.totalWeight || isNaN(parseFloat(formData.totalWeight)) || parseFloat(formData.totalWeight) <= 0) errors.push('Please enter a valid total weight (> 0).');
+        }
+
+        if (errors.length > 0) {
+          setError(errors.join(' '));
+          return;
+        }
+
+        setError('');
+
+        // Calculate rated currents
+        const kva = parseFloat(formData.kva);
+        const hvVoltage = parseFloat(formData.hvVoltage);
+        const lvVoltage = parseFloat(formData.lvVoltage);
+        const phases = parseInt(formData.phases);
+        let hvCurrent, lvCurrent;
+        if (phases === 3) {
+          hvCurrent = (kva * 1000) / (Math.sqrt(3) * hvVoltage);
+          lvCurrent = (kva * 1000) / (Math.sqrt(3) * lvVoltage);
+        } else {
+          hvCurrent = (kva * 1000) / hvVoltage;
+          lvCurrent = (kva * 1000) / lvVoltage;
+        }
+
+        // Initialize report variables
+        let noLoadLosses = parseFloat(formData.noLoadLosses) / 1000; // Convert W to kW
+        let loadLosses = formData.referenceStandards === 'IS:2026' ? parseFloat(formData.loadLosses) / 1000 : 0; // Convert W to kW for IS:2026
+        let maxLosses50 = '';
+        let maxLosses100 = '';
+        let efficiency100 = '';
+        let efficiency75 = '';
+        let efficiency50 = '';
+        let efficiency25 = '';
+
+        // Determine voltage class and multiplier for IS:1180
+        if (formData.referenceStandards === 'IS:1180') {
+          let multiplier = 1.0;
+          if (hvVoltage <= 11000) {
+            multiplier = 1.0; // Up to 11 kV
+          } else if (hvVoltage <= 22000) {
+            multiplier = 1.05; // >11 kV to ≤22 kV
+          } else if (hvVoltage <= 33000) {
+            multiplier = 1.075; // >22 kV to ≤33 kV
+          } else {
+            multiplier = 1.075; // Default to 33 kV multiplier for higher voltages
+          }
+
+          // Get losses from table
+          const kvaValues = Object.keys(maxTotalLosses).map(Number);
+          const closestKva = kvaValues.reduce((prev, curr) =>
+            Math.abs(curr - kva) < Math.abs(prev - kva) ? curr : prev
+          );
+          const losses = maxTotalLosses[closestKva];
+          const level = formData.energyEfficiencyLevel;
+
+          // Calculate losses with multiplier (convert to kW)
+          maxLosses50 = (losses[level].noLoad + losses[level].load50) * multiplier / 1000; // Total Loss at 50%
+          maxLosses100 = (losses[level].noLoad + losses[level].load100) * multiplier / 1000; // Total Loss at 100%
+        } else {
+          // IS:2026 Efficiency Calculations
+          const calculateEfficiency = (loadPercentage) => {
+            const load = (kva * loadPercentage) / 100; // kVA at the load percentage
+            const loadLoss = loadLosses * Math.pow(loadPercentage / 100, 2); // Load loss scales with square of load
+            const totalLoss = noLoadLosses + loadLoss; // Total loss in kW
+            return ((load / (load + totalLoss)) * 100).toFixed(2); // Efficiency in %
+          };
+
+          efficiency100 = calculateEfficiency(100);
+          efficiency75 = calculateEfficiency(75);
+          efficiency50 = calculateEfficiency(50);
+          efficiency25 = calculateEfficiency(25);
+          maxLosses50 = (noLoadLosses + loadLosses * Math.pow(0.5, 2)).toFixed(4); // Total Loss at 50%
+          maxLosses100 = (noLoadLosses + loadLosses).toFixed(3); // Total Loss at 100%
+        }
+
+        // Get HV insulation levels
+        const voltages = Object.keys(insulationLevels).map(Number);
+        const closestVoltage = voltages.reduce((prev, curr) =>
+          Math.abs(curr - (hvVoltage / 1000)) < Math.abs(prev - (hvVoltage / 1000)) ? curr : prev
+        );
+        const insulation = insulationLevels[closestVoltage];
+        const hvInducedValue = insulation.hvInduced === "Twice to Rated Voltage" ? (2 * closestVoltage).toFixed(3) : insulation.hvInduced;
+
+        // Get LV insulation levels
+        const lvVoltages = Object.keys(lvInsulationLevels).map(Number);
+        const closestLvVoltage = lvVoltages.reduce((prev, curr) =>
+          Math.abs(curr - (lvVoltage / 1000)) < Math.abs(prev - (lvVoltage / 1000)) ? curr : prev
+        );
+        const lvInsulation = lvInsulationLevels[closestLvVoltage];
+
+        // Set report data
+        setReport({
+          ...formData,
+          hvCurrent: hvCurrent.toFixed(3),
+          lvCurrent: lvCurrent.toFixed(2),
+          noLoadLosses: noLoadLosses.toFixed(3),
+          loadLosses: loadLosses.toFixed(3),
+          maxLosses50: maxLosses50,
+          maxLosses100: maxLosses100,
+          hvPowerFreq: insulation.hvPowerFreq,
+          lvPowerFreq: lvInsulation.lvPowerFreq,
+          hvInduced: hvInducedValue,
+          lvInduced: lvInsulation.lvInduced,
+          hvImpulse: insulation.hvImpulse,
+          lvImpulse: lvInsulation.lvImpulse,
+          efficiency100: efficiency100,
+          efficiency75: efficiency75,
+          efficiency50: efficiency50,
+          efficiency25: efficiency25,
+          length: showAdditionalDetails ? formData.length : 'N/A',
+          width: showAdditionalDetails ? formData.width : 'N/A',
+          height: showAdditionalDetails ? formData.height : 'N/A',
+          coreWindingsWeight: showAdditionalDetails ? formData.coreWindingsWeight : 'N/A',
+          tankFittingsWeight: showAdditionalDetails ? formData.tankFittingsWeight : 'N/A',
+          oilMass: showAdditionalDetails ? formData.oilMass : 'N/A',
+          totalWeight: showAdditionalDetails ? formData.totalWeight : 'N/A'
+        });
+      };
+
+      // Rendering the form and report
+      return (
+        <div className="container mx-auto p-4 max-w-6xl">
+          <h1 className="text-3xl font-bold text-center mb-6 text-blue-800">
+            Distribution Transformer
+          </h1>
+
+          {/* Input Form */}
+          <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 className="text-xl font-bold mb-4">ANNEXURE – I</h2>
+            <h3 className="text-lg font-semibold mb-4">
+              TECHNICAL PARTICULARS FOR DISTRIBUTION TRANSFORMER
+            </h3>
+            {error && (
+              <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+            )}
+            <table className="w-full border-collapse border border-gray-300 text-sm">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-2">Sr. No.</th>
+                  <th className="border border-gray-300 p-2">Description</th>
+                  <th className="border border-gray-300 p-2">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-2">1</td>
+                  <td className="border border-gray-300 p-2">Name of the Manufacturer</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="manufacturer"
+                      value={formData.manufacturer}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">2</td>
+                  <td className="border border-gray-300 p-2">Customer</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="customer"
+                      value={formData.customer}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">3</td>
+                  <td className="border border-gray-300 p-2">Service</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="service"
+                      value={formData.service}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Outdoor">Outdoor</option>
+                      <option value="Indoor">Indoor</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">4</td>
+                  <td className="border border-gray-300 p-2">KVA (enter in kVA)</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="kva"
+                      value={formData.kva}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">5</td>
+                  <td className="border border-gray-300 p-2">Rated Voltage (enter in V):</td>
+                  <td className="border border-gray-300 p-2">
+                    HV (No Load): <input
+                      type="number"
+                      name="hvVoltage"
+                      value={formData.hvVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    LV (No Load): <input
+                      type="number"
+                      name="lvVoltage"
+                      value={formData.lvVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">6</td>
+                  <td className="border border-gray-300 p-2">Rated Frequency</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="frequency"
+                      value={formData.frequency}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="50">50 Hz</option>
+                      <option value="60">60 Hz</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">7</td>
+                  <td className="border border-gray-300 p-2">No. of Phases</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="phases"
+                      value={formData.phases}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="1">1 Phase</option>
+                      <option value="3">3 Phases</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">8</td>
+                  <td className="border border-gray-300 p-2">Connections</td>
+                  <td className="border border-gray-300 p-2">
+                    HV Winding: <select
+                      name="hvConnection"
+                      value={formData.hvConnection}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      aria-label="HV Winding Connection"
+                    >
+                      <option value="Delta">Delta</option>
+                      <option value="Star">Star</option>
+                      <option value="Zigzag">Zigzag</option>
+                    </select><br />
+                    LV Winding: <select
+                      name="lvConnection"
+                      value={formData.lvConnection}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="LV Winding Connection"
+                    >
+                      <option value="Delta">Delta</option>
+                      <option value="Star">Star</option>
+                      <option value="Zigzag">Zigzag</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">9</td>
+                  <td className="border border-gray-300 p-2">Connection Symbol</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="vectorGroup"
+                      value={formData.vectorGroup}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Dyn11">Dyn11</option>
+                      <option value="YnYn0">YnYn0</option>
+                      <option value="YnD11">YnD11</option>
+                      <option value="YnD1">YnD1</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">10</td>
+                  <td className="border border-gray-300 p-2">Type of Tap Changer</td>
+                  <td className="border border-gray-300 p-2">
+                    Type: <select
+                      name="tapChangerType"
+                      value={formData.tapChangerType}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      aria-label="Tap Changer Type"
+                    >
+                      <option value="">Select Type</option>
+                      <option value="On Load Tap Changer">On Load Tap Changer</option>
+                      <option value="Off Load Tap Changer">Off Load Tap Changer</option>
+                    </select><br />
+                    Make: <select
+                      name="tapChangerMake"
+                      value={formData.tapChangerMake}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      aria-label="Tap Changer Make"
+                    >
+                      <option value="">Select Make</option>
+                      <option value="Reputed">Reputed</option>
+                      <option value="By Hand">By Hand</option>
+                    </select><br />
+                    Tapping Range: <input
+                      type="text"
+                      name="tappingRange"
+                      value={formData.tappingRange}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    /><br />
+                    No. of Steps / Position: <input
+                      type="text"
+                      name="tapSteps"
+                      value={formData.tapSteps}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">11</td>
+                  <td className="border border-gray-300 p-2">Type of Cooling</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="coolingType"
+                      value={formData.coolingType}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ONAN">ONAN</option>
+                      <option value="OFWF">OFWF</option>
+                      <option value="OFAF">OFAF</option>
+                      <option value="ONAF">ONAF</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">12</td>
+                  <td className="border border-gray-300 p-2">Temperature Rise Above Ambient of 50°C</td>
+                  <td className="border border-gray-300 p-2">
+                    a) Oil (enter in °C): <input
+                      type="number"
+                      name="topOilTemp"
+                      value={formData.topOilTemp}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    b) Winding (enter in °C): <input
+                      type="number"
+                      name="windingTemp"
+                      value={formData.windingTemp}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">13</td>
+                  <td className="border border-gray-300 p-2">Energy Efficiency Level</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="energyEfficiencyLevel"
+                      value={formData.energyEfficiencyLevel}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="level1">Level 1</option>
+                      <option value="level2">Level 2</option>
+                      <option value="level3">Level 3</option>
+                      <option value="level4">Level 4</option>
+                      <option value="level5">Level 5</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">14</td>
+                  <td className="border border-gray-300 p-2">No Load Losses (enter in W)</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="noLoadLosses"
+                      value={formData.noLoadLosses}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                {formData.referenceStandards === 'IS:2026' && (
+                  <tr>
+                    <td className="border border-gray-300 p-2">15</td>
+                    <td className="border border-gray-300 p-2">Load Losses (enter in W)</td>
+                    <td className="border border-gray-300 p-2">
+                      <input
+                        type="number"
+                        name="loadLosses"
+                        value={formData.loadLosses}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="any"
+                      />
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '16' : '15'}</td>
+                  <td className="border border-gray-300 p-2">Impedance Voltage (enter in %)</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="impedanceVoltage"
+                      value={formData.impedanceVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '17' : '16'}</td>
+                  <td className="border border-gray-300 p-2">Insulation Class</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="insulationClass"
+                      value={formData.insulationClass}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '18' : '17'}</td>
+                  <td className="border border-gray-300 p-2">Terminal Arrangement</td>
+                  <td className="border border-gray-300 p-2">
+                    a) High Voltage: <select
+                      name="hvTerminal"
+                      value={formData.hvTerminal}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    >
+                      <option value="Cable Box">Cable Box</option>
+                      <option value="Other">Other</option>
+                    </select><br />
+                    b) Lower Voltage: <select
+                      name="lvTerminal"
+                      value={formData.lvTerminal}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Bus Duct">Bus Duct</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '19' : '18'}</td>
+                  <td className="border border-gray-300 p-2">Paint</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="paint"
+                      value={formData.paint}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '20' : '19'}</td>
+                  <td className="border border-gray-300 p-2">Reference Standards</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="referenceStandards"
+                      value={formData.referenceStandards}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="IS:1180">Indoor (IS:1180)</option>
+                      <option value="IS:2026">Export (IS:2026)</option>
+                    </select>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="mt-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-blue-600"
+                  checked={showAdditionalDetails}
+                  onChange={handleCheckboxChange}
+                />
+                <span className="ml-2 text-gray-700">Enter Additional Details (Dimensions & Weight)</span>
+              </label>
+            </div>
+
+            {showAdditionalDetails && (
+              <table className="w-full border-collapse border border-gray-300 text-sm mt-4">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="border border-gray-300 p-2">Sr. No.</th>
+                    <th className="border border-gray-300 p-2">Description</th>
+                    <th className="border border-gray-300 p-2">Particulars</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '21' : '20'}</td>
+                    <td className="border border-gray-300 p-2">Dimensions</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Length (enter in mm): <input
+                        type="number"
+                        name="length"
+                        value={formData.length}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                        step="any"
+                      /><br />
+                      b) Width (enter in mm): <input
+                        type="number"
+                        name="width"
+                        value={formData.width}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                        step="any"
+                      /><br />
+                      c) Height (enter in mm): <input
+                        type="number"
+                        name="height"
+                        value={formData.height}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="any"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">{formData.referenceStandards === 'IS:2026' ? '22' : '21'}</td>
+                    <td className="border border-gray-300 p-2">Weight Details</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Core & Windings (enter in kg): <input
+                        type="number"
+                        name="coreWindingsWeight"
+                        value={formData.coreWindingsWeight}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                        step="any"
+                      /><br />
+                      b) Tank & Fittings (enter in kg): <input
+                        type="number"
+                        name="tankFittingsWeight"
+                        value={formData.tankFittingsWeight}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                        step="any"
+                      /><br />
+                      c) Oil Mass (enter in kg): <input
+                        type="text"
+                        name="oilMass"
+                        value={formData.oilMass}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      /><br />
+                      d) Total Weight (enter in kg): <input
+                        type="number"
+                        name="totalWeight"
+                        value={formData.totalWeight}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="any"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+            <button
+              onClick={calculateParameters}
+              className="mt-4 w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 transition"
+            >
+              See Final Report
+            </button>
+          </div>
+
+          {/* Report Section */}
+          {report && (
+            <div id="report-section" className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-bold mb-4">ANNEXURE – I</h2>
+              <h3 className="text-lg font-semibold mb-4">
+                TECHNICAL PARTICULARS FOR {report.kva} KVA, {parseFloat(report.hvVoltage) / 1000} KV/{parseFloat(report.lvVoltage) / 1000} KV DISTRIBUTION TRANSFORMER
+                {report.tapChangerType === 'On Load Tap Changer' && ' WITH ON LOAD TAP CHANGER (ONTC)'}
+                {report.tapChangerType === 'Off Load Tap Changer' && ' WITH OFF LOAD TAP CHANGER (OFTC)'}
+              </h3>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="border border-gray-300 p-2">Sr. No.</th>
+                    <th className="border border-gray-300 p-2">Description</th>
+                    <th className="border border-gray-300 p-2">Particulars</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 p-2">1</td>
+                    <td className="border border-gray-300 p-2">Name of the Manufacturer</td>
+                    <td className="border border-gray-300 p-2">{report.manufacturer}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">2</td>
+                    <td className="border border-gray-300 p-2">Customer</td>
+                    <td className="border border-gray-300 p-2">{report.customer}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">3</td>
+                    <td className="border border-gray-300 p-2">Service</td>
+                    <td className="border border-gray-300 p-2">{report.service}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">4</td>
+                    <td className="border border-gray-300 p-2">KVA</td>
+                    <td className="border border-gray-300 p-2">{report.kva} kVA</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">5</td>
+                    <td className="border border-gray-300 p-2">Rated Voltage</td>
+                    <td className="border border-gray-300 p-2">
+                      HV (No Load): {report.hvVoltage} V<br />
+                      LV (No Load): {report.lvVoltage} V
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">6</td>
+                    <td className="border border-gray-300 p-2">Rated Current</td>
+                    <td className="border border-gray-300 p-2">
+                      HV Winding: {report.hvCurrent} Amps<br />
+                      LV Winding: {report.lvCurrent} Amps
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">7</td>
+                    <td className="border border-gray-300 p-2">Rated Frequency</td>
+                    <td className="border border-gray-300 p-2">{report.frequency} Hz</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">8</td>
+                    <td className="border border-gray-300 p-2">No. of Phases</td>
+                    <td className="border border-gray-300 p-2">{report.phases}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">9</td>
+                    <td className="border border-gray-300 p-2">Connections</td>
+                    <td className="border border-gray-300 p-2">
+                      HV Winding: {report.hvConnection}<br />
+                      LV Winding: {report.lvConnection}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">10</td>
+                    <td className="border border-gray-300 p-2">Connection Symbol</td>
+                    <td className="border border-gray-300 p-2">{report.vectorGroup}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">11</td>
+                    <td className="border border-gray-300 p-2">Type of Tap Changer</td>
+                    <td className="border border-gray-300 p-2">
+                      Type: {report.tapChangerType}<br />
+                      Make: {report.tapChangerMake}<br />
+                      Tapping Range: {report.tappingRange}<br />
+                      No. of Steps / Position: {report.tapSteps}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">12</td>
+                    <td className="border border-gray-300 p-2">Type of Cooling</td>
+                    <td className="border border-gray-300 p-2">{report.coolingType}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">13</td>
+                    <td className="border border-gray-300 p-2">Temperature Rise Above Ambient of 50°C</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Oil: {report.topOilTemp} °C<br />
+                      b) Winding: {report.windingTemp} °C
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">14</td>
+                    <td className="border border-gray-300 p-2">Having Losses Complying to {report.referenceStandards}</td>
+                    <td className="border border-gray-300 p-2">
+                      {report.referenceStandards === 'IS:2026' ? (
+                        <>
+                          No Load Losses: {report.noLoadLosses} kW<br />
+                          Load Losses: {report.loadLosses} kW<br /><br />
+                          Total Losses at 100% Load: {report.maxLosses100} kW<br />
+                          Total Losses at 50% Load: {report.maxLosses50} kW<br /><br />
+                          Efficiency at 100% Load: {report.efficiency100} %<br />
+                          Efficiency at 75% Load: {report.efficiency75} %<br />
+                          Efficiency at 50% Load: {report.efficiency50} %<br />
+                          Efficiency at 25% Load: {report.efficiency25} %
+                        </>
+                      ) : (
+                        <>
+                          Max. Losses at 100% Load: {report.maxLosses100} kW (Max.)<br />
+                          Max. Losses at 50% Load: {report.maxLosses50} kW (Max.)<br />
+                          No Load Losses: {report.noLoadLosses} kW
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">15</td>
+                    <td className="border border-gray-300 p-2">Impedance Voltage</td>
+                    <td className="border border-gray-300 p-2">{report.impedanceVoltage} %</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">16</td>
+                    <td className="border border-gray-300 p-2">Insulation Class</td>
+                    <td className="border border-gray-300 p-2">{report.insulationClass}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">17</td>
+                    <td className="border border-gray-300 p-2">Basic Insulation Level</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Separate Source Power Frequency Voltage Withstand:<br />
+                      HV Winding: {report.hvPowerFreq} kV rms<br />
+                      LV Winding: {report.lvPowerFreq} kV rms<br /><br />
+                      b) Induced Over Voltage Withstand Voltage:<br />
+                      HV Winding: {report.hvInduced} kV rms<br />
+                      LV Winding: {report.lvInduced} kV rms<br /><br />
+                      c) Full Wave Lightning Impulse Withstand Voltage:<br />
+                      HV Winding: {report.hvImpulse} kVp<br />
+                      LV Winding: {report.lvImpulse}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">18</td>
+                    <td className="border border-gray-300 p-2">Terminal Arrangement</td>
+                    <td className="border border-gray-300 p-2">
+                      a) High Voltage: {report.hvTerminal}<br />
+                      b) Lower Voltage: {report.lvTerminal}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">19</td>
+                    <td className="border border-gray-300 p-2">Paint</td>
+                    <td className="border border-gray-300 p-2">{report.paint}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">20</td>
+                    <td className="border border-gray-300 p-2">Reference Standards</td>
+                    <td className="border border-gray-300 p-2">{report.referenceStandards}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">21</td>
+                    <td className="border border-gray-300 p-2">Dimensions</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Length: {report.length} mm<br />
+                      b) Width: {report.width} mm<br />
+                      c) Height: {report.height} mm
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">22</td>
+                    <td className="border border-gray-300 p-2">Weight Details</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Core & Windings: {report.coreWindingsWeight} kg<br />
+                      b) Tank & Fittings: {report.tankFittingsWeight} kg<br />
+                      c) Oil Mass: {report.oilMass} kg<br />
+                      d) Total Weight: {report.totalWeight} kg
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h2 className="text-xl font-bold mt-8 mb-4">ANNEXURE – II</h2>
+              <h3 className="text-lg font-semibold mb-4">
+                LIST OF FITTINGS & ACCESSORIES FOR DISTRIBUTION TRANSFORMER
+                {report.tapChangerType === 'On Load Tap Changer' && ' WITH ON LOAD TAP CHANGER (ONTC)'}
+                {report.tapChangerType === 'Off Load Tap Changer' && ' WITH OFF LOAD TAP CHANGER (OFTC)'}
+              </h3>
+              <div className="text-sm">
+                <p>1. Rating & Diagram Plate: 1 No.</p>
+                <p>2. Earthing Terminals: 2 Nos.</p>
+                <p>3. Lifting Lugs: 2 Nos.</p>
+                <p>4. Jacking Pads: 4 Nos.</p>
+                <p>5. First Fill of Mineral Oil: 1 Lot</p>
+                <p>6. Thermometer Pocket: 1 No.</p>
+                <p>7. Oil Level Indicator (Plain): 1 No.</p>
+                <p>8. Drain-cum-Bottom Filter Valve: 1 No.</p>
+                <p>9. Top Filter Valve: 1 No.</p>
+                <p>10. Under Base Skids with Flat Rollers: 4 Nos.</p>
+                <p>11. Explosion Vent / Pressure Release Valve: 1 No.</p>
+                <p>12. Stem Type Thermometer: 1 No.</p>
+                <p>13. Oil Conservator with Drain Plug: 1 No.</p>
+                <p>14. Dehydrating Silica Gel Breather: 1 No.</p>
+                <p>15. Air Release Hole with Plug: 1 No.</p>
+                <p>16. Oil Filling Hole with Cap for Conservator: 1 No.</p>
+                <p>17. Radiators: 1 Set</p>
+                <p>18. HV Termination Cable Box: 1 No.</p>
+                <p>19. LV Termination Bus Duct: 1 No.</p>
+                <p>20. Winding Temperature Indicator with WTI CT: 1 No.</p>
+                <p>21. Oil Temperature Indicator with Trip & Alarm Contacts: 1 No.</p>
+                <p>22. Buchholz Relay: 1 No.</p>
+                <p>23. Marshalling Box: 1 No.</p>
+                <p>24. Magnetic Oil Gauge: 1 No.</p>
+                {report.tapChangerType === 'On Load Tap Changer' && (
+                  <p>25. On Load Tap Changer with RTCC Panel & AVR: 1 No.</p>
+                )}
+                {report.tapChangerType === 'Off Load Tap Changer' && (
+                  <p>25. Off Load Tap Changer: 1 No.</p>
+                )}
+                {!report.tapChangerType && (
+                  <p>25. Tap Changer: N/A</p>
+                )}
+                <p>26. Neutral Bushing: 1 No.</p>
+              </div>
+
+              {/* PDF Download Link */}
+              <div className="mt-6 text-center print-button">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="bg-green-600 text-white p-3 rounded hover:bg-green-700 transition"
+                >
+                  Save Report as PDF
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Rendering the app
+    root.render(<App />);
+  </script>
+</body>
+</html>

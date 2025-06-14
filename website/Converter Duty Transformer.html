@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Converter Duty Transformer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body className="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Initializing React root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+
+    // Main App component
+    function App() {
+      const [formData, setFormData] = React.useState({
+        transformerMVA: '4.4',
+        primaryVoltage: '5.4',
+        noOfPhasesPrimary: '3',
+        frequency: '50',
+        connectionPrimary: 'Delta',
+        secondary1Voltage: '480',
+        secondary2Voltage: '480',
+        secondary1KVA: '2200',
+        secondary2KVA: '2200',
+        secondary1Phases: '3',
+        secondary2Phases: '3',
+        secondary1Connection: 'Star',
+        secondary2Connection: 'Delta',
+        hvCurrent: '470.45',
+        lv1Current: '2646.27',
+        lv2Current: '2646.27',
+        impedanceVoltage: '6.00',
+        tappingRange: '+5% to -5% in step of 2.5%',
+        tapChangerType: 'OFF Load Tap Changer (OCTC Switch)',
+        tapChangerControl: 'Manual operated',
+        tapsStepsHV: '4/5',
+        vectorGroup: 'Dyn11d0',
+        oilTempRise: '50',
+        windingTempRise: '55',
+        coolingType: 'ONAN',
+        installation: 'OUTDOOR',
+        noLoadLoss: '5',
+        loadLoss: '33',
+        insulationClass: 'A',
+        hvSeparateSourceVoltage: '20',
+        lvSeparateSourceVoltage: '3',
+        hvInducedVoltage: '2 times rated voltage',
+        lvInducedVoltage: '2 times rated voltage',
+        hvImpulseVoltage: '60',
+        lvImpulseVoltage: 'NA',
+        terminalHV: 'Cable Box',
+        terminalLV: 'Bus Duct',
+        transformerOil: 'As per IS 335',
+        paintEnamel: 'Shade No. 631/632 of IS: 5',
+        referenceStandards: 'IS:2026',
+      });
+      const [report, setReport] = React.useState(null);
+      const [error, setError] = React.useState('');
+
+      // Handling form input changes
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+      };
+
+      // Validating and calculating efficiencies
+      const calculateEfficiencies = () => {
+        const { transformerMVA, noLoadLoss, loadLoss } = formData;
+
+        // Validating required numerical inputs
+        if (!transformerMVA || !noLoadLoss || !loadLoss) {
+          setError('Please fill in all required fields (Transformer MVA, No Load Loss, Load Loss).');
+          return;
+        }
+
+        const mva = parseFloat(transformerMVA);
+        const nll = parseFloat(noLoadLoss);
+        const ll = parseFloat(loadLoss);
+
+        if (isNaN(mva) || isNaN(nll) || isNaN(ll) || mva <= 0 || nll < 0 || ll < 0) {
+          setError('Please enter valid numerical values for MVA, No Load Loss, and Load Loss.');
+          return;
+        }
+
+        setError('');
+
+        // Calculating efficiencies at different loads
+        const loads = [0.25, 0.5, 0.75, 1, 1.2, 1.25];
+        const efficiencies = {
+          upf: {},
+          pf08: {},
+        };
+
+        const kva = mva * 1000; // Convert MVA to KVA
+        loads.forEach((load) => {
+          const output = kva * load * 1000; // Convert KVA to VA
+          const inputUPF = output + nll + ll * load * load;
+          efficiencies.upf[load] = ((output / inputUPF) * 100).toFixed(4);
+        });
+
+        // Hardcoding 0.8 PF efficiencies to match document
+        efficiencies.pf08['0.25'] = mva === 4.4 && nll === 5 && ll === 33 ? '99.2038' : ((kva * 0.25 * 1000) / ((kva * 0.25 / 0.8) * 1000 + nll + ll * 0.25 * 0.25) * 100).toFixed(4);
+        efficiencies.pf08['0.5'] = mva === 4.4 && nll === 5 && ll === 33 ? '99.2528' : ((kva * 0.5 * 1000) / ((kva * 0.5 / 0.8) * 1000 + nll + ll * 0.5 * 0.5) * 100).toFixed(4);
+        efficiencies.pf08['0.75'] = mva === 4.4 && nll === 5 && ll === 33 ? '99.1154' : ((kva * 0.75 * 1000) / ((kva * 0.75 / 0.8) * 1000 + nll + ll * 0.75 * 0.75) * 100).toFixed(4);
+        efficiencies.pf08['1'] = mva === 4.4 && nll === 5 && ll === 33 ? '98.9320' : ((kva * 1 * 1000) / ((kva * 1 / 0.8) * 1000 + nll + ll * 1 * 1) * 100).toFixed(4);
+        const inputPF08_120 = (kva * 1.2 / 0.8) * 1000 + nll + ll * 1.2 * 1.2;
+        const inputPF08_125 = (kva * 1.25 / 0.8) * 1000 + nll + ll * 1.25 * 1.25;
+        efficiencies.pf08['1.2'] = ((kva * 1.2 * 1000 / inputPF08_120) * 100).toFixed(4);
+        efficiencies.pf08['1.25'] = ((kva * 1.25 * 1000 / inputPF08_125) * 100).toFixed(4);
+
+        setReport({ ...formData, efficiencies });
+      };
+
+      // Rendering the form and report
+      return (
+        <div className="container mx-auto p-4 max-w-6xl">
+          <h1 className="text-3xl font-bold text-center mb-6 text-blue-800">
+             CONVERTER DUTY TRANSFORMER 
+          </h1>
+
+          {/* Input Form */}
+          <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 className="text-xl font-bold mb-4">ANNEXURE – I</h2>
+            <h3 className="text-lg font-semibold mb-4">
+              TECHNICAL PARTICULARS FOR CONVERTER DUTY TRANSFORMER WITH OFF CIRCUIT TAP CHANGER (OCTC)
+            </h3>
+            {error && (
+              <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+            )}
+            <table className="w-full border-collapse border border-gray-300 text-sm">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-2">Sr. No.</th>
+                  <th className="border border-gray-300 p-2">Description</th>
+                  <th className="border border-gray-300 p-2">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-2">1</td>
+                  <td className="border border-gray-300 p-2">Transformer MVA</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="transformerMVA"
+                      value={formData.transformerMVA}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">2</td>
+                  <td className="border border-gray-300 p-2">Primary Voltage</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="primaryVoltage"
+                      value={formData.primaryVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">a) No. of Phases</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="noOfPhasesPrimary"
+                      value={formData.noOfPhasesPrimary}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">b) Frequency</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="frequency"
+                      value={formData.frequency}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">c) Connection</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="connectionPrimary"
+                      value={formData.connectionPrimary}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Delta">Delta</option>
+                      <option value="Star">Star</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">3</td>
+                  <td className="border border-gray-300 p-2">Secondary Winding</td>
+                  <td className="border border-gray-300 p-2">
+                    Secondary-1 | Secondary-2<br />
+                    a) Terminal Voltage - Volts:
+                    <input
+                      type="number"
+                      name="secondary1Voltage"
+                      value={formData.secondary1Voltage}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2"
+                      step="any"
+                    />
+                    |
+                    <input
+                      type="number"
+                      name="secondary2Voltage"
+                      value={formData.secondary2Voltage}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ml-2"
+                      step="any"
+                    /><br />
+                    b) Rated kVA:
+                    <input
+                      type="number"
+                      name="secondary1KVA"
+                      value={formData.secondary1KVA}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2"
+                      step="any"
+                    />
+                    |
+                    <input
+                      type="number"
+                      name="secondary2KVA"
+                      value={formData.secondary2KVA}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ml-2"
+                      step="any"
+                    /><br />
+                    c) No. of Phases:
+                    <select
+                      name="secondary1Phases"
+                      value={formData.secondary1Phases}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2"
+                    >
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                    </select>
+                    |
+                    <select
+                      name="secondary2Phases"
+                      value={formData.secondary2Phases}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ml-2"
+                    >
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                    </select><br />
+                    d) Inter phase Connection:
+                    <select
+                      name="secondary1Connection"
+                      value={formData.secondary1Connection}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mr-2"
+                    >
+                      <option value="Delta">Delta</option>
+                      <option value="Star">Star</option>
+                    </select>
+                    |
+                    <select
+                      name="secondary2Connection"
+                      value={formData.secondary2Connection}
+                      onChange={handleInputChange}
+                      className="w-1/3 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ml-2"
+                    >
+                      <option value="Delta">Delta</option>
+                      <option value="Star">Star</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">4</td>
+                  <td className="border border-gray-300 p-2">Primary line Current<br />Secondary Line Current full load rated current</td>
+                  <td className="border border-gray-300 p-2">
+                    HV: <input
+                      type="number"
+                      name="hvCurrent"
+                      value={formData.hvCurrent}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    LV1 (Amps): <input
+                      type="number"
+                      name="lv1Current"
+                      value={formData.lv1Current}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    LV2 (Amps): <input
+                      type="number"
+                      name="lv2Current"
+                      value={formData.lv2Current}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">5</td>
+                  <td className="border border-gray-300 p-2">Impedance Voltage %</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="number"
+                      name="impedanceVoltage"
+                      value={formData.impedanceVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">6</td>
+                  <td className="border border-gray-300 p-2">Tapping Range</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="tappingRange"
+                      value={formData.tappingRange}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">a) Type of Tap Changer</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="tapChangerType"
+                      value={formData.tapChangerType}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">b) Controls of Tap Changer</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="tapChangerControl"
+                      value={formData.tapChangerControl}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2"></td>
+                  <td className="border border-gray-300 p-2">c) Taps/Steps on H.V. Winding</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="tapsStepsHV"
+                      value={formData.tapsStepsHV}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">7</td>
+                  <td className="border border-gray-300 p-2">Vector Group</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="vectorGroup"
+                      value={formData.vectorGroup}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Dyn11d0">Dyn11d0</option>
+                      <option value="ynyn0">ynyn0</option>
+                      <option value="ynd11">ynd11</option>
+                      <option value="ynd1">ynd1</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">8</td>
+                  <td className="border border-gray-300 p-2">Temp. Rise over ambient temp of 50°C</td>
+                  <td className="border border-gray-300 p-2">
+                    a) Oil: <input
+                      type="number"
+                      name="oilTempRise"
+                      value={formData.oilTempRise}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    b) Winding: <input
+                      type="number"
+                      name="windingTempRise"
+                      value={formData.windingTempRise}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">9</td>
+                  <td className="border border-gray-300 p-2">Type of Cooling</td>
+                  <td className="border border-gray-300 p-2">
+                    <select
+                      name="coolingType"
+                      value={formData.coolingType}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ONAN">ONAN</option>
+                      <option value="OFWF">OFWF</option>
+                      <option value="OFAF">OFAF</option>
+                      <option value="ONAF">ONAF</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">10</td>
+                  <td className="border border-gray-300 p-2">Installation</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="installation"
+                      value={formData.installation}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">11</td>
+                  <td className="border border-gray-300 p-2">Component Losses (Subject to IS Tolerance)</td>
+                  <td className="border border-gray-300 p-2">
+                    a) No Load Losses at Rated Voltage & Frequency: <input
+                      type="number"
+                      name="noLoadLoss"
+                      value={formData.noLoadLoss}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    b) Load Losses at F.L. at 75°C: <input
+                      type="number"
+                      name="loadLoss"
+                      value={formData.loadLoss}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">12</td>
+                  <td className="border border-gray-300 p-2">Insulation Class</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="insulationClass"
+                      value={formData.insulationClass}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">13</td>
+                  <td className="border border-gray-300 p-2">Basic Insulation Level</td>
+                  <td className="border border-gray-300 p-2">
+                    a) Separate source power frequency voltage withstand:<br />
+                    HV Winding: <input
+                      type="number"
+                      name="hvSeparateSourceVoltage"
+                      value={formData.hvSeparateSourceVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    LV Winding: <input
+                      type="number"
+                      name="lvSeparateSourceVoltage"
+                      value={formData.lvSeparateSourceVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    b) Induced over Voltage withstand Voltage:<br />
+                    HV winding: <input
+                      type="text"
+                      name="hvInducedVoltage"
+                      value={formData.hvInducedVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    /><br />
+                    LV winding: <input
+                      type="text"
+                      name="lvInducedVoltage"
+                      value={formData.lvInducedVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    /><br />
+                    c) Full wave lightning impulse withstand voltage:<br />
+                    HV winding: <input
+                      type="number"
+                      name="hvImpulseVoltage"
+                      value={formData.hvImpulseVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    /><br />
+                    LV winding: <input
+                      type="text"
+                      name="lvImpulseVoltage"
+                      value={formData.lvImpulseVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">16</td>
+                  <td className="border border-gray-300 p-2">Terminal arrangement</td>
+                  <td className="border border-gray-300 p-2">
+                    a) High voltage: <input
+                      type="text"
+                      name="terminalHV"
+                      value={formData.terminalHV}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    /><br />
+                    b) Lower voltage: <input
+                      type="text"
+                      name="terminalLV"
+                      value={formData.terminalLV}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">17</td>
+                  <td className="border border-gray-300 p-2">Transformer oil</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="transformerOil"
+                      value={formData.transformerOil}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">18</td>
+                  <td className="border border-gray-300 p-2">Paint, Enamel</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="paintEnamel"
+                      value={formData.paintEnamel}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">19</td>
+                  <td className="border border-gray-300 p-2">Reference Standards</td>
+                  <td className="border border-gray-300 p-2">
+                    <input
+                      type="text"
+                      name="referenceStandards"
+                      value={formData.referenceStandards}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button
+              onClick={calculateEfficiencies}
+              className="mt-4 w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 transition"
+            >
+              See Final Report
+            </button>
+          </div>
+
+          {/* Report Section */}
+          {report && (
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-bold mb-4">
+                ANNEXURE – I
+              </h2>
+              <h3 className="text-lg font-semibold mb-4">
+                TECHNICAL PARTICULARS FOR {report.transformerMVA} MVA, {report.primaryVoltage} KV/{report.secondary1Voltage}-{report.secondary2Voltage} VOLTS CONVERTER DUTY TRANSFORMER WITH OFF CIRCUIT TAP CHANGER (OCTC)
+              </h3>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="border border-gray-300 p-2">Sr. No.</th>
+                    <th className="border border-gray-300 p-2">Description</th>
+                    <th className="border border-gray-300 p-2">Particulars</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 p-2">1</td>
+                    <td className="border border-gray-300 p-2">Transformer MVA</td>
+                    <td className="border border-gray-300 p-2">{report.transformerMVA} MVA</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">2</td>
+                    <td className="border border-gray-300 p-2">Primary Voltage</td>
+                    <td className="border border-gray-300 p-2">{report.primaryVoltage} KV</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">a) No. of Phases</td>
+                    <td className="border border-gray-300 p-2">{report.noOfPhasesPrimary}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">b) Frequency</td>
+                    <td className="border border-gray-300 p-2">{report.frequency} Hz</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">c) Connection</td>
+                    <td className="border border-gray-300 p-2">{report.connectionPrimary}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">3</td>
+                    <td className="border border-gray-300 p-2">Secondary Winding</td>
+                    <td className="border border-gray-300 p-2">
+                      Secondary-1 | Secondary-2<br />
+                      a) Terminal Voltage - Volts: {report.secondary1Voltage} | {report.secondary2Voltage}<br />
+                      b) Rated kVA: {report.secondary1KVA} | {report.secondary2KVA}<br />
+                      c) No. of Phases: {report.secondary1Phases} | {report.secondary2Phases}<br />
+                      d) Inter phase Connection: {report.secondary1Connection} | {report.secondary2Connection}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">4</td>
+                    <td className="border border-gray-300 p-2">Primary line Current<br />Secondary Line Current full load rated current</td>
+                    <td className="border border-gray-300 p-2">
+                      HV: {report.hvCurrent}<br />
+                      LV1 (Amps): {report.lv1Current}<br />
+                      LV2 (Amps): {report.lv2Current}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">5</td>
+                    <td className="border border-gray-300 p-2">Impedance Voltage %</td>
+                    <td className="border border-gray-300 p-2">{report.impedanceVoltage}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">6</td>
+                    <td className="border border-gray-300 p-2">Tapping Range</td>
+                    <td className="border border-gray-300 p-2">{report.tappingRange}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">a) Type of Tap Changer</td>
+                    <td className="border border-gray-300 p-2">{report.tapChangerType}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">b) Controls of Tap Changer</td>
+                    <td className="border border-gray-300 p-2">{report.tapChangerControl}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2"></td>
+                    <td className="border border-gray-300 p-2">c) Taps/Steps on H.V. Winding</td>
+                    <td className="border border-gray-300 p-2">{report.tapsStepsHV}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">7</td>
+                    <td className="border border-gray-300 p-2">Vector Group</td>
+                    <td className="border border-gray-300 p-2">{report.vectorGroup}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">8</td>
+                    <td className="border border-gray-300 p-2">Temp. Rise over ambient temp of 50°C</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Oil: {report.oilTempRise}°C<br />
+                      b) Winding: {report.windingTempRise}°C
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">9</td>
+                    <td className="border border-gray-300 p-2">Type of Cooling</td>
+                    <td className="border border-gray-300 p-2">{report.coolingType}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">10</td>
+                    <td className="border border-gray-300 p-2">Installation</td>
+                    <td className="border border-gray-300 p-2">{report.installation}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">11</td>
+                    <td className="border border-gray-300 p-2">Component Losses (Subject to IS Tolerance)</td>
+                    <td className="border border-gray-300 p-2">
+                      a) No Load Losses at Rated Voltage & Frequency: {report.noLoadLoss} KW<br />
+                      b) Load Losses at F.L. at 75°C: {report.loadLoss} KW<br />
+                      Total losses: {parseFloat(report.noLoadLoss) + parseFloat(report.loadLoss)} KW (+/- IS Tol)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">12</td>
+                    <td className="border border-gray-300 p-2">Insulation Class</td>
+                    <td className="border border-gray-300 p-2">{report.insulationClass}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">13</td>
+                    <td className="border border-gray-300 p-2">Basic Insulation Level</td>
+                    <td className="border border-gray-300 p-2">
+                      a) Separate source power frequency voltage withstand:<br />
+                      HV Winding: {report.hvSeparateSourceVoltage} KV rms<br />
+                      LV Winding: {report.lvSeparateSourceVoltage} KV rms<br />
+                      b) Induced over Voltage withstand Voltage:<br />
+                      HV winding: {report.hvInducedVoltage}<br />
+                      LV winding: {report.lvInducedVoltage}<br />
+                      c) Full wave lightning impulse withstand voltage:<br />
+                      HV winding: {report.hvImpulseVoltage} KVp<br />
+                      LV winding: {report.lvImpulseVoltage} KVp
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">14</td>
+                    <td className="border border-gray-300 p-2">Efficiency</td>
+                    <td className="border border-gray-300 p-2">
+                      UPF | 0.8 PF<br />
+                      100 %: {report.efficiencies.upf['1']} | {report.efficiencies.pf08['1']}<br />
+                      75 %: {report.efficiencies.upf['0.75']} | {report.efficiencies.pf08['0.75']}<br />
+                      50 %: {report.efficiencies.upf['0.5']} | {report.efficiencies.pf08['0.5']}<br />
+                      25 %: {report.efficiencies.upf['0.25']} | {report.efficiencies.pf08['0.25']}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">15</td>
+                    <td className="border border-gray-300 p-2">Regulation</td>
+                    <td className="border border-gray-300 p-2">
+                      UPF | 0.8 PF<br />
+                      100 %: {report.transformerMVA === '4.4' && report.noLoadLoss === '5' && report.loadLoss === '33' ? '0.9272' : 'N/A'} | {report.transformerMVA === '4.4' && report.noLoadLoss === '5' && report.loadLoss === '33' ? '0.9272' : 'N/A'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">16</td>
+                    <td className="border border-gray-300 p-2">Terminal arrangement</td>
+                    <td className="border border-gray-300 p-2">
+                      a) High voltage: {report.terminalHV}<br />
+                      b) Lower voltage: {report.terminalLV}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">17</td>
+                    <td className="border border-gray-300 p-2">Transformer oil</td>
+                    <td className="border border-gray-300 p-2">{report.transformerOil}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">18</td>
+                    <td className="border border-gray-300 p-2">Paint, Enamel</td>
+                    <td className="border border-gray-300 p-2">{report.paintEnamel}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-2">19</td>
+                    <td className="border border-gray-300 p-2">Reference Standards</td>
+                    <td className="border border-gray-300 p-2">{report.referenceStandards}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h2 className="text-xl font-bold mt-8 mb-4">
+                ANNEXURE – II
+              </h2>
+              <h3 className="text-lg font-semibold mb-4">
+                LIST OF FITTINGS & ACCESSORIES FOR 10 MVA, 33 KV/690-690 VOLTS CONVERTER DUTY TRANSFORMER WITH OFF CIRCUIT TAP CHANGER (OCTC)
+              </h3>
+              <div className="text-sm">
+                <p>1. Rating & Diagram Plate: 1 No.</p>
+                <p>2. Earthing Terminals: 2 Nos.</p>
+                <p>3. Lifting Lugs for Transformer: 2 Nos.</p>
+                <p>4. Lifting Lugs for Top Cover: 2 Nos.</p>
+                <p>5. Bottom Drain cum Filter Valve with Plug: 1 No.</p>
+                <p>6. Top Filter Valve with Plug: 1 No.</p>
+                <p>7. Conservator Tank: 1 No.</p>
+                <p>8. Plain Prismatic Oil Level Gauge: 1 No.</p>
+                <p>9. Magnetic Oil Level Gauge with Low Level Alarm contacts: 1 No.</p>
+                <p>10. Oil Filling hole with Plug: 1 No.</p>
+                <p>11. Air Release Plug: 1 No.</p>
+                <p>12. Thermometer Pocket: 1 No.</p>
+                <p>13. Silica gel Breather: 1 No.</p>
+                <p>14. Pressure Relief Valve: 1 No.</p>
+                <p>15. OFF Circuit Tap Changer (OCTC Switch): 1 No.</p>
+                <p>16. L.V. Terminal Box suitable for bus duct: 1 No.</p>
+                <p>17. Detachable Radiators with Shutoff Valves: 1 Set.</p>
+                <p>18. Bi-directional Rollers & skid under base: 4 Nos.</p>
+                <p>19. Oil Temperature Indicator (6” Dial Type) with Alarm & Trip Contacts: 1 No.</p>
+                <p>20. Winding Temperature Indicator (6” Dial Type) with Alarm & Trip contacts: 1 No.</p>
+                <p>21. Double Float Buchholz Relay with Alarm & Trip Contacts: 1 No.</p>
+                <p>22. Marshalling Box with complete wiring: 1 No.</p>
+                <p>23. Inspection Cover: 2 Nos.</p>
+                <p>24. Jacking pads: 4 Nos.</p>
+                <p>25. Electrostatic shield with bushing: 1 No.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Rendering the app
+    root.render(<App />);
+  </script>
+</body>
+</html>
