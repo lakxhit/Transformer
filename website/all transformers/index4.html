@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Selection</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container" id="main-menu">
+        <h1>Select a Transformer</h1>
+        <div class="button-grid">
+            <button onclick="window.location.href='../Distribution Transformer .html'">Distribution Transformer</button>
+            <button onclick="window.location.href='../Converter Duty Transformer.html'">Converter Duty Transformer</button>
+            <button onclick="showPage('furnace')">Furnace Transformer</button>
+            <button onclick="showPage('ehv')">EHV Power Transformers</button>
+            <button onclick="showPage('dry-type')">Dry-Type Transformers</button>
+            <button onclick="showPage('special-purpose')">Special Purpose Transformers</button>
+            <button onclick="showPage('reactors')">Reactors: Series and Shunt</button>
+        </div>
+    </div>
+
+    <!-- Transformer Pages -->
+    <div id="distribution" class="transformer-page">
+        <h2>Distribution Transformer Page</h2>
+        <p>This is the Distribution Transformer page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <div id="furnace" class="transformer-page">
+        <h2>Furnace Transformer Page</h2>
+        <p>This is the Furnace Transformer page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <div id="ehv" class="transformer-page">
+        <h2>EHV Power Transformers Page</h2>
+        <p>This is the EHV Power Transformers page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <div id="dry-type" class="transformer-page">
+        <h2>Dry-Type Transformers Page</h2>
+        <p>This is the Dry-Type Transformers page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <div id="special-purpose" class="transformer-page">
+        <h2>Special Purpose Transformers Page</h2>
+        <p>This is the Special Purpose Transformers page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <div id="reactors" class="transformer-page">
+        <h2>Reactors: Series and Shunt Page</h2>
+        <p>This is the Reactors: Series and Shunt page. Calculations and results will be added here.</p>
+        <button class="back-button" onclick="showMainMenu()">Back to Menu</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
