@@ -1,0 +1,2542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distribution Transformer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #report-section, #report-section * {
+        visibility: visible;
+      }
+      #report-section {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+      }
+      #report-section .print-button {
+        display: none;
+      }
+      .page-break { page-break-before: always; break-before: page; }
+    }
+    @media (max-width: 640px) {
+      .logo-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .logo-header img {
+        margin-right: 0;
+        margin-bottom: 1rem;
+      }
+    }
+  </style>
+</head>
+<body className="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+
+    const insulationLevels = {
+      1.1: {
+        hvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", hvImpulse: "NA",
+        lvPowerFreq: 3, lvInduced: "Twice to Rated Voltage", lvImpulse: "NA"
+      },
+      3.6: {
+        hvPowerFreq: 10, hvInduced: "Twice to Rated Voltage", hvImpulse: 20,
+        lvPowerFreq: 10, lvInduced: "Twice to Rated Voltage", lvImpulse: 20
+      },
+      6.6: {
+        hvPowerFreq: 20, hvInduced: "Twice to Rated Voltage", hvImpulse: 60,
+        lvPowerFreq: 20, lvInduced: "Twice to Rated Voltage", lvImpulse: 60
+      },
+      11: {
+        hvPowerFreq: 28, hvInduced: "Twice to Rated Voltage", hvImpulse: 75,
+        lvPowerFreq: 28, lvInduced: "Twice to Rated Voltage", lvImpulse: 75
+      },
+      15: {
+        hvPowerFreq: 38, hvInduced: "Twice to Rated Voltage", hvImpulse: 95,
+        lvPowerFreq: 38, lvInduced: "Twice to Rated Voltage", lvImpulse: 95
+      },
+      22: {
+        hvPowerFreq: 50, hvInduced: "Twice to Rated Voltage", hvImpulse: 125,
+        lvPowerFreq: 50, lvInduced: "Twice to Rated Voltage", lvImpulse: 125
+      },
+      33: {
+        hvPowerFreq: 70, hvInduced: "Twice to Rated Voltage", hvImpulse: 170,
+        lvPowerFreq: 70, lvInduced: "Twice to Rated Voltage", lvImpulse: 170
+      },
+      66: {
+        hvPowerFreq: 140, hvInduced: "Twice to Rated Voltage", hvImpulse: 325,
+        lvPowerFreq: 140, lvInduced: "Twice to Rated Voltage", lvImpulse: 325
+      },
+      110: {
+        hvPowerFreq: 185, hvInduced: "Twice to Rated Voltage", hvImpulse: 450,
+        lvPowerFreq: 185, lvInduced: "Twice to Rated Voltage", lvImpulse: 450
+      },
+      132: {
+        hvPowerFreq: 230, hvInduced: "Twice to Rated Voltage", hvImpulse: 550,
+        lvPowerFreq: 230, lvInduced: "Twice to Rated Voltage", lvImpulse: 550
+      },
+      220: {
+        hvPowerFreq: 395, hvInduced: "Twice to Rated Voltage", hvImpulse: 950,
+        lvPowerFreq: 395, lvInduced: "Twice to Rated Voltage", lvImpulse: 950
+      },
+      400: {
+        hvPowerFreq: 570, hvInduced: "Twice to Rated Voltage", hvImpulse: 1300,
+        lvPowerFreq: 570, lvInduced: "Twice to Rated Voltage", lvImpulse: 1300
+      },
+      420.1: {
+        hvPowerFreq: 630, hvInduced: "Twice to Rated Voltage", hvImpulse: 1425,
+        lvPowerFreq: 630, lvInduced: "Twice to Rated Voltage", lvImpulse: 1425
+      }
+    };
+
+    const minimumClearances = {
+      0: { phaseToPhase: 25, phaseToEarth: 20 },
+      1.1: { phaseToPhase: 30, phaseToEarth: 25 },
+      3.6: { phaseToPhase: 75, phaseToEarth: 60 },
+      7.2: { phaseToPhase: 120, phaseToEarth: 90 },
+      12: { phaseToPhase: 280, phaseToEarth: 140 },
+      24: { phaseToPhase: 330, phaseToEarth: 230 },
+      36: { phaseToPhase: 350, phaseToEarth: 320 },
+      52: { phaseToPhase: 530, phaseToEarth: 480 },
+      72.5: { phaseToPhase: 700, phaseToEarth: 660 },
+      145: {
+        default: { phaseToPhase: 1220, phaseToEarth: 1050 },
+        550: { phaseToPhase: 1220, phaseToEarth: 1050 },
+        650: { phaseToPhase: 1430, phaseToEarth: 1270 }
+      },
+      245: {
+        default: { phaseToPhase: 2000, phaseToEarth: 1800 },
+        950: { phaseToPhase: 2000, phaseToEarth: 1800 },
+        1050: { phaseToPhase: 2350, phaseToEarth: 2150 }
+      },
+      420: { phaseToPhase: 4000, phaseToEarth: 3500 },
+      800: { phaseToPhase: 6700, phaseToEarth: 5800 }
+    };
+
+    const cableBoxClearances = {
+      0: { phaseToPhase: 25, phaseToEarth: 20 },
+      1.1: { phaseToPhase: 25, phaseToEarth: 20 },
+      3.6: { phaseToPhase: 50, phaseToEarth: 50 },
+      7.2: { phaseToPhase: 90, phaseToEarth: 70 },
+      12: { phaseToPhase: 130, phaseToEarth: 80 },
+      24: { phaseToPhase: 241, phaseToEarth: 140 },
+      36: { phaseToPhase: 351, phaseToEarth: 222 },
+    };
+
+    const maxTotalLosses = {
+      250: {
+        level1: { noLoad: 480, load50: 500, load100: 2450 },
+        level2: { noLoad: 450, load50: 470, load100: 2250 },
+        level3: { noLoad: 424, load50: 440, load100: 2064 },
+        level4: { noLoad: 398, load50: 413, load100: 1895 },
+        level5: { noLoad: 373, load50: 388, load100: 1740 }
+      },
+      315: {
+        level1: { noLoad: 525, load50: 500, load100: 2575 },
+        level2: { noLoad: 490, load50: 465, load100: 2260 },
+        level3: { noLoad: 460, load50: 430, load100: 1980 },
+        level4: { noLoad: 429, load50: 400, load100: 1735 },
+        level5: { noLoad: 400, load50: 372, load100: 1520 }
+      },
+      400: {
+        level1: { noLoad: 625, load50: 600, load100: 2825 },
+        level2: { noLoad: 590, load50: 560, load100: 2740 },
+        level3: { noLoad: 550, load50: 530, load100: 2664 },
+        level4: { noLoad: 513, load50: 500, load100: 2589 },
+        level5: { noLoad: 481, load50: 470, load100: 2513 }
+      },
+      500: {
+        level1: { noLoad: 760, load50: 750, load100: 3540 },
+        level2: { noLoad: 720, load50: 710, load100: 3380 },
+        level3: { noLoad: 684, load50: 670, load100: 3225 },
+        level4: { noLoad: 642, load50: 640, load100: 3085 },
+        level5: { noLoad: 605, load50: 610, load100: 2949 }
+      },
+      630: {
+        level1: { noLoad: 960, load50: 900, load100: 4340 },
+        level2: { noLoad: 895, load50: 850, load100: 3955 },
+        level3: { noLoad: 837, load50: 800, load100: 3601 },
+        level4: { noLoad: 786, load50: 750, load100: 3275 },
+        level5: { noLoad: 741, load50: 700, load100: 2976 }
+      },
+      800: {
+        level1: { noLoad: 1187, load50: 1100, load100: 5216 },
+        level2: { noLoad: 1117, load50: 1030, load100: 4721 },
+        level3: { noLoad: 1015, load50: 1000, load100: 4308 },
+        level4: { noLoad: 942, load50: 950, load100: 3911 },
+        level5: { noLoad: 876, load50: 900, load100: 3549 }
+      },
+      1000: {
+        level1: { noLoad: 1400, load50: 1390, load100: 6300 },
+        level2: { noLoad: 1320, load50: 1300, load100: 5680 },
+        level3: { noLoad: 1260, load50: 1200, load100: 5104 },
+        level4: { noLoad: 1160, load50: 1150, load100: 4625 },
+        level5: { noLoad: 1070, load50: 1100, load100: 4189 }
+      },
+      1250: {
+        level1: { noLoad: 1700, load50: 1600, load100: 7500 },
+        level2: { noLoad: 1600, load50: 1620, load100: 6800 },
+        level3: { noLoad: 1500, load50: 1642, load100: 6170 },
+        level4: { noLoad: 1370, load50: 1696, load100: 5633 },
+        level5: { noLoad: 1300, load50: 1691, load100: 5094 }
+      },
+      1600: {
+        level1: { noLoad: 2600, load50: 1600, load100: 9200 },
+        level2: { noLoad: 2450, load50: 1520, load100: 8850 },
+        level3: { noLoad: 2300, load50: 1453, load100: 8521 },
+        level4: { noLoad: 2150, load50: 1397, load100: 8213 },
+        level5: { noLoad: 2000, load50: 1353, load100: 7924 }
+      },
+      2000: {
+        level1: { noLoad: 3050, load50: 2000, load100: 11950 },
+        level2: { noLoad: 2890, load50: 1900, load100: 11210 },
+        level3: { noLoad: 2743, load50: 1800, load100: 10511 },
+        level4: { noLoad: 2569, load50: 1740, load100: 9890 },
+        level5: { noLoad: 2388, load50: 1700, load100: 9323 }
+      },
+      2500: {
+        level1: { noLoad: 3650, load50: 2500, load100: 14850 },
+        level2: { noLoad: 3500, load50: 2400, load100: 14000 },
+        level3: { noLoad: 3360, load50: 2300, load100: 13194 },
+        level4: { noLoad: 3130, load50: 2300, load100: 12529 },
+        level5: { noLoad: 2909, load50: 2300, load100: 11904 }
+      }
+    };
+
+    function App() {
+      // Move this to the top of the App function, before any useState calls:
+      const allStandardFittings = [
+        'Rating & Diagram Plate:',
+        'Earthing Terminals: ',
+        'Lifting Lugs: ',
+        'Jacking Pads: ',
+        'First Fill of Mineral Oil:',
+        'Thermometer Pocket: ',
+        'Oil Level Indicator (Plain): ',
+        'Drain-cum-Bottom Filter Valve: ',
+        'Top Filter Valve: ',
+        'Under Base Skids with Flat Rollers: ',
+        'Explosion Vent / Pressure Release Valve: ',
+        'Stem Type Thermometer: ',
+        'Oil Conservator with Drain Plug: ',
+        'Dehydrating Silica Gel Breather: ',
+        'Air Release Hole with Plug: ',
+        'Oil Filling Hole with Cap for Conservator: ',
+        'Radiators: ',
+        'HV Termination',
+        'LV Termination',
+        'Winding Temperature Indicator with WTI CT: ',
+        'Oil Temperature Indicator with Trip & Alarm Contacts: ',
+        'Buchholz Relay: ',
+        'Marshalling Box: ',
+        'Magnetic Oil Gauge: ',
+
+        'Neutral Bushing: '
+      ];
+
+
+      const [formData, setFormData] = React.useState({
+        manufacturer: 'Mahati Industries Pvt. Ltd.',
+        customer: '',
+        annexureNumber: 'I',
+        numberOfTransformers: '',
+        referenceStandards: 'IS:1180',
+        service: 'Outdoor',
+        kva: '',
+        kvaList: [],
+        hvVoltage: '',
+        lvVoltage: '',
+        frequency: '50',
+        phases: '3',
+        hvConnection: 'Delta',
+        lvConnection: 'Star',
+        vectorGroup: 'Dyn11',
+        tapChangerType: '',
+        tapChangerMake: '',
+        tappingRange: '',
+        tapSteps: '',
+        coolingType: [],
+        topOilTemp: '',
+        windingTemp: '',
+        impedanceVoltage: '',
+        insulationClass: '',
+        hvTerminal: [],
+        lvTerminal: [],
+        paint: [],
+        energyEfficiencyLevel: 'level1',
+        hvCurrent: '',
+        lvCurrent: '',
+        noLoadLosses: '',
+        loadLosses: '',
+        maxLosses50: '',
+        maxLosses100: '',
+        hvPowerFreq: '',
+        lvPowerFreq: '',
+        hvInduced: '',
+        lvInduced: '',
+        hvImpulse: '',
+        lvImpulse: '',
+        efficiency100: '',
+        efficiency75: '',
+        efficiency50: '',
+        efficiency25: '',
+        efficiency100_08pf: '',
+        efficiency75_08pf: '',
+        efficiency50_08pf: '',
+        efficiency25_08pf: '',
+        efficiency100_085pf: '',
+        efficiency75_085pf: '',
+        efficiency50_085pf: '',
+        efficiency25_085pf: '',
+        efficiency100_09pf: '',
+        efficiency75_09pf: '',
+        efficiency50_09pf: '',
+        efficiency25_09pf: '',
+        efficiency100_095pf: '',
+        efficiency75_095pf: '',
+        efficiency50_095pf: '',
+        efficiency25_095pf: '',
+        length: '',
+        width: '',
+        height: '',
+        coreWindingsWeight: '',
+        tankFittingsWeight: '',
+        oilMass: '',
+        oilMassLitre: '',
+        totalWeight: '',
+        ambient: '',
+      });
+      const [registerOutput, setRegisterOutput] = React.useState('');
+      const [showAdditionalDetails, setShowAdditionalDetails] = React.useState(false);
+      const [showAdditionalFittings, setShowAdditionalFittings] = React.useState(false);
+      const [newFitting, setNewFitting] = React.useState('');
+      const [newFittingQty, setNewFittingQty] = React.useState(1);
+      const [report, setReport] = React.useState(null);
+      const [error, setError] = React.useState('');
+      const [showCoolingDropdown, setShowCoolingDropdown] = React.useState(false);
+      const [showTapChangerTypeDropdown, setShowTapChangerTypeDropdown] = React.useState(false);
+      const [showTapChangerMakeDropdown, setShowTapChangerMakeDropdown] = React.useState(false);
+      const [showTappingRangeDropdown, setShowTappingRangeDropdown] = React.useState(false);
+      const [showTapStepsDropdown, setShowTapStepsDropdown] = React.useState(false);
+      const [showPaintDropdown, setShowPaintDropdown] = React.useState(false);
+      const [showHvTerminalDropdown, setShowHvTerminalDropdown] = React.useState(false);
+      const [showLvTerminalDropdown, setShowLvTerminalDropdown] = React.useState(false);
+      const [kvaInput, setKvaInput] = React.useState('');
+      // BIL selection state hooks (must be at top level)
+      const [selectedHvBil, setSelectedHvBil] = React.useState(null);
+      const [selectedLvBil, setSelectedLvBil] = React.useState(null);
+      // 1. Add state for fittingQuantities
+      const [fittingQuantities, setFittingQuantities] = React.useState(() => {
+        const obj = {};
+        allStandardFittings.forEach(f => { obj[f] = 1; });
+        return obj;
+      });
+      const [additionalFittings, setAdditionalFittings] = React.useState([]); // [{desc, qty}]
+      const [errors, setErrors] = React.useState({});
+
+      // State for custom text inputs
+      const [customTapChangerMake, setCustomTapChangerMake] = React.useState('');
+      const [customPaint, setCustomPaint] = React.useState('');
+
+
+      const onLoadTapChangerMakes = ['CTR', 'OLG', 'E-MR', 'HM', 'Reputed', 'Customize'];
+      const offLoadTapChangerMakes = ['Paragon', 'Alwaye', 'Reputed', 'Customize'];
+
+      const onLoadTappingRanges = [
+        '+10 % to -10% @ 1.25%',
+        '+5 % to -15% @ 1.25%',
+        '+15 % to -5% @ 1.25%',
+        '+7.5 % to -12.5% @ 1.25%',
+        '+12.5 % to -7.5% @ 1.25%'
+      ];
+
+      const offLoadTappingRanges = [
+        '+5% to -5% @2.5%',
+        '+7.5% to -7.5% @2.5%',
+        '+10% to -10% @2.5%',
+        '+5% to -7.5% @2.5%',
+        '+7.5% to -5% @2.5%',
+        '+5% to -10% @2.5%',
+        '+10% to -5% @2.5%',
+        '+7.5% to -10% @2.5%',
+        '+10% to -7.5% @2.5%'
+      ];
+
+      const onLoadTapSteps = ['16/17'];
+      const offLoadTapSteps = ['4/5', '6/7', '8/9', '5/6', '7/8'];
+
+      const handleTapChangerMakeChange = (option) => {
+        setFormData(prev => {
+            const currentMakes = prev.tapChangerMake ? prev.tapChangerMake.split(', ').filter(Boolean) : [];
+            const index = currentMakes.indexOf(option);
+
+            if (index === -1) {
+                currentMakes.push(option);
+            } else {
+                currentMakes.splice(index, 1);
+                // If "Customize" is deselected, clear its text field
+                if (option === 'Customize') {
+                    setCustomTapChangerMake('');
+                }
+            }
+
+            // Clear error if now valid
+            setErrors(prevErrors => {
+                const newErrors = { ...prevErrors };
+                if (currentMakes.length > 0) {
+                    delete newErrors.tapChangerMake;
+                }
+                return newErrors;
+            });
+
+            return { ...prev, tapChangerMake: currentMakes.join(', ') };
+        });
+    };
+
+    const handlePaintChange = (option) => {
+        setFormData(prev => {
+            const currentPaints = [...prev.paint];
+            const index = currentPaints.indexOf(option);
+
+            if (index === -1) {
+                currentPaints.push(option);
+            } else {
+                currentPaints.splice(index, 1);
+                 // If "Customize" is deselected, clear its text field
+                if (option === 'Customize') {
+                    setCustomPaint('');
+                }
+            }
+            // Clear error if now valid
+            setErrors(prevErrors => {
+                const newErrors = { ...prevErrors };
+                if (currentPaints.length > 0) {
+                    delete newErrors.paint;
+                }
+                return newErrors;
+            });
+            return { ...prev, paint: currentPaints };
+        });
+    };
+
+    // New handler for custom text inputs
+    const handleCustomInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'customTapChangerMake') {
+            setCustomTapChangerMake(value);
+        } else if (name === 'customPaint') {
+            setCustomPaint(value);
+        }
+    };
+
+
+      const calculateRegulation = (loadPercentage, powerFactor) => {
+        const kva = formData.kvaList.length > 0 ? Math.max(...formData.kvaList) : parseFloat(formData.kva);
+        const impedanceVoltage = parseFloat(formData.impedanceVoltage);
+
+        // For IS:1180, we need to calculate load losses from the standard values
+        let loadLossesKw = 0;
+        if (formData.referenceStandards === 'IS:2026') {
+          loadLossesKw = parseFloat(formData.loadLosses) / 1000;
+        } else if (formData.referenceStandards === 'IS:1180') {
+          // Calculate load losses from standard values for IS:1180
+          const hvVoltageV = parseFloat(formData.hvVoltage) * 1000;
+          let multiplier = 1.0;
+          if (hvVoltageV <= 11000) {
+            multiplier = 1.0;
+          } else if (hvVoltageV > 11000 && hvVoltageV <= 22000) {
+            multiplier = 1.05;
+          } else if (hvVoltageV > 22000 && hvVoltageV <= 33000) {
+            multiplier = 1.075;
+          } else {
+            multiplier = 1.075;
+          }
+
+          const kvaValues = Object.keys(maxTotalLosses).map(Number);
+          const closestKva = kvaValues.reduce((prev, curr) =>
+            Math.abs(curr - kva) < Math.abs(prev - kva) ? curr : prev
+          );
+          const losses = maxTotalLosses[closestKva];
+          const level = formData.energyEfficiencyLevel;
+
+          // Calculate load losses from total losses minus no load losses
+          const totalLosses100 = (losses[level].noLoad + losses[level].load100) * multiplier / 1000;
+          const noLoadLossesKw = losses[level].noLoad * multiplier / 1000;
+          loadLossesKw = totalLosses100 - noLoadLossesKw;
+        }
+
+        if (!kva || !impedanceVoltage || !loadLossesKw) {
+          return 'N/A';
+        }
+
+        const resistance = (loadLossesKw * 100) / kva;
+        const valInsideSqrt = Math.pow(impedanceVoltage, 2) - Math.pow(resistance, 2);
+        const reactance = Math.sqrt(Math.max(0, valInsideSqrt));
+
+        const n = loadPercentage / 100;
+        const theta = Math.acos(powerFactor);
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+
+        const firstPart = (resistance * cosTheta) + (n * reactance * sinTheta);
+        const secondPartNumerator = Math.pow((n * reactance * cosTheta) - (n * resistance * sinTheta), 2);
+        const secondPart = secondPartNumerator / 200;
+
+        const regulation = firstPart + secondPart;
+        return regulation.toFixed(4);
+      };
+
+      const handleCoolingTypeChange = (option) => {
+        setFormData(prev => {
+          const currentTypes = [...prev.coolingType];
+          const index = currentTypes.indexOf(option);
+
+          if (index === -1) {
+            currentTypes.push(option);
+          } else {
+            currentTypes.splice(index, 1);
+          }
+          // Clear error if now valid
+          setErrors(prevErrors => {
+            const newErrors = { ...prevErrors };
+            if (currentTypes.length > 0) {
+              delete newErrors.coolingType;
+            }
+            return newErrors;
+          });
+          return { ...prev, coolingType: currentTypes };
+        });
+      };
+
+      const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        if (name === 'coolingType') {
+          return;
+        }
+        if (name === 'hvVoltage') {
+          setSelectedHvBil(null);
+        }
+        if (name === 'lvVoltage') {
+          setSelectedLvBil(null);
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
+
+        // Clear error for this field if now valid
+        setErrors(prevErrors => {
+          const newErrors = { ...prevErrors };
+          if (name === 'ambient' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.ambient;
+          }
+          if (name === 'topOilTemp' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.topOilTemp;
+          }
+          if (name === 'windingTemp' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.windingTemp;
+          }
+          if (name === 'kvaInput' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.kva;
+          }
+          if (name === 'hvVoltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.hvVoltage;
+          }
+          if (name === 'lvVoltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.lvVoltage;
+          }
+          if (name === 'numberOfTransformers' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.numberOfTransformers;
+          }
+          if (name === 'manufacturer' && value) {
+            delete newErrors.manufacturer;
+          }
+          if (name === 'referenceStandards' && value) {
+            delete newErrors.referenceStandards;
+          }
+          if (name === 'tapChangerType' && value) {
+            delete newErrors.tapChangerType;
+          }
+          if (name === 'tapChangerMake' && value) {
+            delete newErrors.tapChangerMake;
+          }
+          if (name === 'tappingRange' && value) {
+            delete newErrors.tappingRange;
+          }
+          if (name === 'tapSteps' && value) {
+            delete newErrors.tapSteps;
+          }
+          if (name === 'impedanceVoltage' && value) {
+            delete newErrors.impedanceVoltage;
+          }
+          if (name === 'insulationClass' && value) {
+            delete newErrors.insulationClass;
+          }
+          if (name === 'paint' && value) {
+            delete newErrors.paint;
+          }
+          if (name === 'energyEfficiencyLevel' && value) {
+            delete newErrors.energyEfficiencyLevel;
+          }
+          if (name === 'noLoadLosses' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.noLoadLosses;
+          }
+          if (name === 'loadLosses' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+            delete newErrors.loadLosses;
+          }
+          return newErrors;
+        });
+      };
+
+      const handleCheckboxChange = (e) => {
+        setShowAdditionalDetails(e.target.checked);
+        if (!e.target.checked) {
+          setFormData(prev => ({
+            ...prev,
+            length: '',
+            width: '',
+            height: '',
+            coreWindingsWeight: '',
+            tankFittingsWeight: '',
+            oilMass: '',
+            oilMassLitres: '',
+            totalWeight: ''
+          }));
+        }
+      };
+
+      const handleDownloadPDF = () => {
+        window.print();
+      };
+
+      const calculateParameters = () => {
+        const newErrors = {};
+        if (!formData.manufacturer) newErrors.manufacturer = 'Please enter a manufacturer name.';
+        if (!formData.referenceStandards) newErrors.referenceStandards = 'Please select reference standards.';
+        if ((!formData.kva || isNaN(parseFloat(formData.kva)) || parseFloat(formData.kva) <= 0) && formData.kvaList.length === 0) newErrors.kva = 'Please enter a valid kVA rating (> 0) or add kVA values to the list.';
+        if (!formData.hvVoltage || isNaN(parseFloat(formData.hvVoltage)) || parseFloat(formData.hvVoltage) <= 0) newErrors.hvVoltage = 'Please enter a valid HV voltage (> 0).';
+        if (!formData.lvVoltage || isNaN(parseFloat(formData.lvVoltage)) || parseFloat(formData.lvVoltage) <= 0) newErrors.lvVoltage = 'Please enter a valid LV voltage (> 0).';
+/* Removed the validation that enforces HV voltage must be greater than LV voltage */
+// if (parseFloat(formData.hvVoltage) <= parseFloat(formData.lvVoltage)) newErrors.hvVoltage = 'HV voltage must be greater than LV voltage.';
+        if (!formData.topOilTemp || isNaN(parseFloat(formData.topOilTemp)) || parseFloat(formData.topOilTemp) <= 0) newErrors.topOilTemp = 'Please enter a valid oil temperature rise (> 0).';
+        if (!formData.windingTemp || isNaN(parseFloat(formData.windingTemp)) || parseFloat(formData.windingTemp) <= 0) newErrors.windingTemp = 'Please enter a valid winding temperature rise (> 0).';
+        if (!formData.tapChangerType) newErrors.tapChangerType = 'Please select a tap changer type.';
+        if (!formData.tapChangerMake) newErrors.tapChangerMake = 'Please select a tap changer make.';
+        if (!formData.tappingRange) newErrors.tappingRange = 'Please enter a tapping range.';
+        if (!formData.tapSteps) newErrors.tapSteps = 'Please enter the number of steps/position.';
+        if (!formData.impedanceVoltage) newErrors.impedanceVoltage = 'Please enter an impedance voltage.';
+        if (!formData.insulationClass) newErrors.insulationClass = 'Please enter an insulation class.';
+        if (!formData.paint.length) newErrors.paint = 'Please select at least one paint type and shade.';
+        if (!formData.coolingType || formData.coolingType.length === 0) newErrors.coolingType = 'Please select at least one cooling type.';
+        if (!formData.ambient || isNaN(parseFloat(formData.ambient)) || parseFloat(formData.ambient) <= 0) newErrors.ambient = 'Please enter a valid ambient temperature (> 0).';
+        if (formData.referenceStandards === 'IS:2026' && (!formData.noLoadLosses || isNaN(parseFloat(formData.noLoadLosses)) || parseFloat(formData.noLoadLosses) <= 0)) {
+          newErrors.noLoadLosses = 'Please enter a valid no load losses (> 0) for IS:2026.';
+        }
+        if (formData.referenceStandards === 'IS:2026' && (!formData.loadLosses || isNaN(parseFloat(formData.loadLosses)) || parseFloat(formData.loadLosses) <= 0)) {
+          newErrors.loadLosses = 'Please enter a valid load losses (> 0) for IS:2026.';
+        }
+        if (!formData.numberOfTransformers || isNaN(parseFloat(formData.numberOfTransformers)) || parseFloat(formData.numberOfTransformers) <= 0) newErrors.numberOfTransformers = 'Please enter a valid number of transformers (> 0).';
+        if (showAdditionalDetails) {
+          if (!formData.length || isNaN(parseFloat(formData.length)) || parseFloat(formData.length) <= 0) newErrors.length = 'Please enter a valid length (> 0).';
+          if (!formData.width || isNaN(parseFloat(formData.width)) || parseFloat(formData.width) <= 0) newErrors.width = 'Please enter a valid width (> 0).';
+          if (!formData.height || isNaN(parseFloat(formData.height)) || parseFloat(formData.height) <= 0) newErrors.height = 'Please enter a valid height (> 0).';
+          if (!formData.coreWindingsWeight || isNaN(parseFloat(formData.coreWindingsWeight)) || parseFloat(formData.coreWindingsWeight) <= 0) newErrors.coreWindingsWeight = 'Please enter a valid core & windings weight (> 0).';
+          if (!formData.tankFittingsWeight || isNaN(parseFloat(formData.tankFittingsWeight)) || parseFloat(formData.tankFittingsWeight) <= 0) newErrors.tankFittingsWeight = 'Please enter a valid tank & fittings weight (> 0).';
+          if (!formData.oilMass) newErrors.oilMass = 'Please enter a valid oil mass.';
+          if (!formData.oilMassLitre) newErrors.oilMassLitre = 'Please enter a valid oil mass in litres.';
+          if (!formData.totalWeight || isNaN(parseFloat(formData.totalWeight)) || parseFloat(formData.totalWeight) <= 0) newErrors.totalWeight = 'Please enter a valid total weight (> 0).';
+        }
+        if (Object.keys(newErrors).length > 0) {
+          setErrors(newErrors);
+          return;
+        }
+        setErrors({});
+
+        const kva = formData.kvaList.length > 0 ? Math.max(...formData.kvaList) : parseFloat(formData.kva);
+        // Convert kV to V for internal calculations
+        const hvVoltageV = parseFloat(formData.hvVoltage) * 1000;
+        const lvVoltageV = parseFloat(formData.lvVoltage) * 1000;
+        const phases = parseInt(formData.phases);
+        let hvCurrent, lvCurrent;
+        if (phases === 3) {
+          hvCurrent = (kva * 1000) / (Math.sqrt(3) * hvVoltageV);
+          lvCurrent = (kva * 1000) / (Math.sqrt(3) * lvVoltageV);
+        } else {
+          hvCurrent = (kva * 1000) / hvVoltageV;
+          lvCurrent = (kva * 1000) / lvVoltageV;
+        }
+
+        let noLoadLosses = formData.referenceStandards === 'IS:2026' ? parseFloat(formData.noLoadLosses) / 1000 : 0;
+        let loadLosses = formData.referenceStandards === 'IS:2026' ? parseFloat(formData.loadLosses) / 1000 : 0;
+        let maxLosses50 = '';
+        let maxLosses100 = '';
+        let efficiency100 = '';
+        let efficiency75 = '';
+        let efficiency50 = '';
+        let efficiency25 = '';
+        let efficiency100_08pf = '';
+        let efficiency75_08pf = '';
+        let efficiency50_08pf = '';
+        let efficiency25_08pf = '';
+        let efficiency100_085pf = '';
+        let efficiency75_085pf = '';
+        let efficiency50_085pf = '';
+        let efficiency25_085pf = '';
+        let efficiency100_09pf = '';
+        let efficiency75_09pf = '';
+        let efficiency50_09pf = '';
+        let efficiency25_09pf = '';
+        let efficiency100_095pf = '';
+        let efficiency75_095pf = '';
+        let efficiency50_095pf = '';
+        let efficiency25_095pf = '';
+
+        if (formData.referenceStandards === 'IS:1180') {
+          let multiplier = 1.0;
+          if (hvVoltageV <= 11000) {
+            multiplier = 1.0;
+          } else if (hvVoltageV > 11000 && hvVoltageV <= 22000) {
+            multiplier = 1.05;
+          } else if (hvVoltageV > 22000 && hvVoltageV <= 33000) {
+            multiplier = 1.075;
+          } else {
+            multiplier = 1.075;
+          }
+
+          const kvaValues = Object.keys(maxTotalLosses).map(Number);
+          const closestKva = kvaValues.reduce((prev, curr) =>
+            Math.abs(curr - kva) < Math.abs(prev - kva) ? curr : prev
+          );
+          const losses = maxTotalLosses[closestKva];
+          const level = formData.energyEfficiencyLevel;
+
+          maxLosses50 = ((losses[level].noLoad + losses[level].load50) * multiplier / 1000).toFixed(4);
+          maxLosses100 = ((losses[level].noLoad + losses[level].load100) * multiplier / 1000).toFixed(3);
+        } else if (formData.referenceStandards === 'IS:2026') {
+          const calculateEfficiency = (loadPercentage, powerFactor = 1.0) => {
+            const load = (kva * loadPercentage) / 100;
+            const outputPower = load * powerFactor;
+            const loadLossAtPercentage = loadLosses * Math.pow(loadPercentage / 100, 2);
+            const totalLosses = noLoadLosses + loadLossAtPercentage;
+            const efficiency = (outputPower / (outputPower + totalLosses)) * 100;
+            return efficiency.toFixed(2);
+          };
+
+          efficiency100 = calculateEfficiency(100, 1.0);
+          efficiency75 = calculateEfficiency(75, 1.0);
+          efficiency50 = calculateEfficiency(50, 1.0);
+          efficiency25 = calculateEfficiency(25, 1.0);
+
+          efficiency100_08pf = calculateEfficiency(100, 0.8);
+          efficiency75_08pf = calculateEfficiency(75, 0.8);
+          efficiency50_08pf = calculateEfficiency(50, 0.8);
+          efficiency25_08pf = calculateEfficiency(25, 0.8);
+
+          efficiency100_085pf = calculateEfficiency(100, 0.85);
+          efficiency75_085pf = calculateEfficiency(75, 0.85);
+          efficiency50_085pf = calculateEfficiency(50, 0.85);
+          efficiency25_085pf = calculateEfficiency(25, 0.85);
+
+          efficiency100_09pf = calculateEfficiency(100, 0.9);
+          efficiency75_09pf = calculateEfficiency(75, 0.9);
+          efficiency50_09pf = calculateEfficiency(50, 0.9);
+          efficiency25_09pf = calculateEfficiency(25, 0.9);
+
+          efficiency100_095pf = calculateEfficiency(100, 0.95);
+          efficiency75_095pf = calculateEfficiency(75, 0.95);
+          efficiency50_095pf = calculateEfficiency(50, 0.95);
+          efficiency25_095pf = calculateEfficiency(25, 0.95);
+        }
+
+        // Find the floor voltage for HV
+        const voltages = Object.keys(insulationLevels).map(Number).sort((a, b) => a - b);
+        const inputHv = parseFloat(formData.hvVoltage);
+        const floorHvVoltage = voltages.reduce((prev, curr) => (curr <= inputHv ? curr : prev), voltages[0]);
+        const insulation = insulationLevels[floorHvVoltage];
+        const hvInducedValue = insulation.hvInduced === "Twice to Rated Voltage" ? (2 * parseFloat(formData.hvVoltage)).toFixed(3) : insulation.hvInduced;
+
+        // Improved LV insulation selection logic for specific ranges
+        const lvVoltageRaw = parseFloat(formData.lvVoltage);
+        let lvInsulation;
+        if (lvVoltageRaw >= 0.433 && lvVoltageRaw < 1.1) {
+          lvInsulation = { lvPowerFreq: 3, lvInduced: "Twice to Rated Voltage", lvImpulse: "NA" };
+        } else if (lvVoltageRaw >= 1.1 && lvVoltageRaw < 3.6) {
+          lvInsulation = { lvPowerFreq: 10, lvInduced: "Twice to Rated Voltage", lvImpulse: 20 };
+        } else {
+          const lvVoltages = Object.keys(insulationLevels).map(Number).sort((a, b) => a - b);
+          const floorLvVoltage = lvVoltages.reduce((prev, curr) => (curr <= lvVoltageRaw ? curr : prev), lvVoltages[0]);
+          lvInsulation = insulationLevels[floorLvVoltage];
+        }
+        const lvInducedValue = lvInsulation.lvInduced === "Twice to Rated Voltage" ? (2 * lvVoltageRaw).toFixed(3) : lvInsulation.lvInduced;
+
+        const hvBIL = (hvBilChoices && selectedHvBil) ? selectedHvBil.impulse : insulation.hvImpulse;
+        const lvBIL = (lvBilChoices && selectedLvBil) ? selectedLvBil.impulse : lvInsulation.lvImpulse;
+        const lvPowerFreq = (lvBilChoices && selectedLvBil) ? selectedLvBil.freq : lvInsulation.lvPowerFreq;
+
+        // Calculate minimum clearances
+        const hvClearances = getMinimumClearances(parseFloat(formData.hvVoltage), hvBIL, formData.hvTerminal);
+        const lvClearances = getMinimumClearances(parseFloat(formData.lvVoltage), lvBIL, formData.lvTerminal);
+
+        // Process custom inputs for the report
+        const finalTapChangerMake = formData.tapChangerMake
+            .split(', ')
+            .map(make => (make === 'Customize' ? customTapChangerMake.trim() : make))
+            .filter(Boolean)
+            .join(', ');
+
+        const finalPaint = formData.paint
+            .map(p => (p === 'Customize' ? customPaint.trim() : p))
+            .filter(Boolean)
+            .join(', ');
+
+        setReport({
+          ...formData,
+          kvaList: formData.kvaList,
+          hvCurrent: hvCurrent.toFixed(3),
+          lvCurrent: lvCurrent.toFixed(2),
+          noLoadLosses: noLoadLosses.toFixed(3),
+          loadLosses: loadLosses.toFixed(3),
+          maxLosses50: maxLosses50,
+          maxLosses100: maxLosses100,
+          hvPowerFreq: (hvBilChoices && selectedHvBil) ? selectedHvBil.freq : insulation.hvPowerFreq,
+          lvPowerFreq: lvPowerFreq,
+          hvInduced: hvInducedValue,
+          lvInduced: lvInducedValue,
+          hvImpulse: hvBIL,
+          lvImpulse: lvBIL,
+          efficiency100: efficiency100,
+          efficiency75: efficiency75,
+          efficiency50: efficiency50,
+          efficiency25: efficiency25,
+          efficiency100_08pf: efficiency100_08pf,
+          efficiency75_08pf: efficiency75_08pf,
+          efficiency50_08pf: efficiency50_08pf,
+          efficiency25_08pf: efficiency25_08pf,
+          efficiency100_085pf,
+          efficiency75_085pf,
+          efficiency50_085pf,
+          efficiency25_085pf,
+          efficiency100_09pf,
+          efficiency75_09pf,
+          efficiency50_09pf,
+          efficiency25_09pf,
+          efficiency100_095pf,
+          efficiency75_095pf,
+          efficiency50_095pf,
+          efficiency25_095pf,
+          length: showAdditionalDetails ? formData.length : 'N/A',
+          width: showAdditionalDetails ? formData.width : 'N/A',
+          height: showAdditionalDetails ? formData.height : 'N/A',
+          coreWindingsWeight: showAdditionalDetails ? formData.coreWindingsWeight : 'N/A',
+          tankFittingsWeight: showAdditionalDetails ? formData.tankFittingsWeight : 'N/A',
+          oilMass: showAdditionalDetails ? formData.oilMass : 'N/A',
+          totalWeight: showAdditionalDetails ? formData.totalWeight : 'N/A',
+          additionalDetails: showAdditionalDetails ? formData.additionalDetails : 'N/A',
+          paint: finalPaint, // Use processed value
+          tapChangerMake: finalTapChangerMake, // Use processed value
+          hvTerminal: formData.hvTerminal,
+          lvTerminal: formData.lvTerminal,
+          ambient: formData.ambient,
+          selectedFittings: selectedFittings,
+          fittingQuantities,
+          additionalFittings,
+          hvClearances,
+          lvClearances,
+          energyEfficiencyLevel: formData.energyEfficiencyLevel,
+        });
+      };
+
+      const getSerialNumber = (baseNumber) => {
+        return baseNumber;
+      };
+
+      const handleHvTerminalChange = (option) => {
+        setFormData(prev => {
+          const currentHvTerminals = [...prev.hvTerminal];
+          const index = currentHvTerminals.indexOf(option);
+          if (index === -1) {
+            currentHvTerminals.push(option);
+          } else {
+            currentHvTerminals.splice(index, 1);
+          }
+          // Clear error if now valid
+          setErrors(prevErrors => {
+            const newErrors = { ...prevErrors };
+            if (currentHvTerminals.length > 0) {
+              delete newErrors.hvTerminal;
+            }
+            return newErrors;
+          });
+          return { ...prev, hvTerminal: currentHvTerminals };
+        });
+      };
+
+      const handleLvTerminalChange = (option) => {
+        setFormData(prev => {
+          const currentLvTerminals = [...prev.lvTerminal];
+          const index = currentLvTerminals.indexOf(option);
+          if (index === -1) {
+            currentLvTerminals.push(option);
+          } else {
+            currentLvTerminals.splice(index, 1);
+          }
+          // Clear error if now valid
+          setErrors(prevErrors => {
+            const newErrors = { ...prevErrors };
+            if (currentLvTerminals.length > 0) {
+              delete newErrors.lvTerminal;
+            }
+            return newErrors;
+          });
+          return { ...prev, lvTerminal: currentLvTerminals };
+        });
+      };
+
+      const handleAddFitting = () => {
+        if (newFitting.trim()) {
+          setAdditionalFittings(prev => [...prev, { desc: newFitting.trim(), qty: newFittingQty }]);
+          setNewFitting('');
+          setNewFittingQty(1);
+        }
+      };
+
+      const handleRemoveFitting = (index) => {
+        setAdditionalFittings(prev => prev.filter((_, i) => i !== index));
+      };
+
+      const handleAddKva = () => {
+        const value = parseFloat(kvaInput);
+        if (!isNaN(value) && value > 0 && !formData.kvaList.includes(value)) {
+          setFormData(prev => ({
+            ...prev,
+            kvaList: [...prev.kvaList, value].sort((a, b) => a - b),
+            kva: '' // Clear single kva field
+          }));
+          setKvaInput('');
+          setErrors(prevErrors => {
+            const newErrors = { ...prevErrors };
+            if ([...formData.kvaList, value].length > 0) {
+              delete newErrors.kva;
+            }
+            return newErrors;
+          });
+        }
+      };
+
+      const handleRemoveKva = (value) => {
+        setFormData(prev => ({
+          ...prev,
+          kvaList: prev.kvaList.filter(kva => kva !== value)
+        }));
+      };
+// Add this new useEffect hook
+      React.useEffect(() => {
+        // This resets dependent fields whenever the tap changer type changes,
+        // preventing invalid data from persisting after switching types.
+        setFormData(prev => ({
+          ...prev,
+          tapChangerMake: '',
+          tappingRange: '',
+          tapSteps: ''
+        }));
+        // Also, ensure the custom input field is cleared
+        setCustomTapChangerMake('');
+      }, [formData.tapChangerType]); // The dependency array is key: this code runs ONLY when tapChangerType changes.
+
+      // Handle clicks outside dropdowns
+      React.useEffect(() => {
+        const handleClickOutside = () => {
+          setShowTapChangerMakeDropdown(false);
+          setShowCoolingDropdown(false);
+          setShowPaintDropdown(false);
+          setShowHvTerminalDropdown(false);
+          setShowLvTerminalDropdown(false);
+        };
+
+        document.addEventListener('click', handleClickOutside);
+        return () => {
+          document.removeEventListener('click', handleClickOutside);
+        };
+      }, []);
+
+      React.useEffect(() => {
+        // Extract numeric values from text input (e.g., "2500kg" -> 2500)
+        const extractNumber = (text) => {
+          if (!text) return 0;
+          const match = text.toString().match(/\d+(?:\.\d+)?/);
+          return match ? parseFloat(match[0]) : 0;
+        };
+
+
+        const core = extractNumber(formData.coreWindingsWeight);
+        const tank = extractNumber(formData.tankFittingsWeight);
+        const oil = extractNumber(formData.oilMass);
+        const total = core + tank + oil;
+
+        if (total > 0) {
+          setFormData(prev => ({ ...prev, totalWeight: total.toFixed(2) }));
+        } else {
+          setFormData(prev => ({ ...prev, totalWeight: '' }));
+        }
+      }, [formData.coreWindingsWeight, formData.tankFittingsWeight, formData.oilMass]);
+
+      const impedanceChart = [
+        { kva: 250, impedance: 4.5 },
+        { kva: 315, impedance: 4.5 },
+        { kva: 400, impedance: 4.5 },
+        { kva: 500, impedance: 4.5 },
+        { kva: 630, impedance: 4.5 },
+        { kva: 800, impedance: 5.0 },
+        { kva: 1000, impedance: 5.0 },
+        { kva: 1250, impedance: 5.0 },
+        { kva: 1600, impedance: 6.25 },
+        { kva: 2000, impedance: 6.25 },
+        { kva: 2500, impedance: 6.25 }
+      ];
+
+      function getImpedanceForKva(kva) {
+        if (!kva || isNaN(kva) || kva <= 0) return '';
+        if (kva <= 630) return 4.5;
+        if (kva <= 1250) return 5.0;
+        return 6.25;
+      }
+
+      function getMinimumClearances(voltage, bil = null, terminalType = []) {
+        if (!voltage || isNaN(voltage) || voltage <= 0) {
+          return { phaseToPhase: 0, phaseToEarth: 0 };
+        }
+
+        const isCableBox = terminalType.includes('Cable Box');
+        let clearancesTable = isCableBox ? cableBoxClearances : minimumClearances;
+
+        const voltageKeys = Object.keys(clearancesTable).map(Number).sort((a, b) => a - b);
+
+        let selectedVoltage = voltageKeys[0];
+        for (let i = 0; i < voltageKeys.length; i++) {
+          if (voltageKeys[i] <= voltage) {
+            selectedVoltage = voltageKeys[i];
+          } else {
+            break;
+          }
+        }
+
+        let clearanceData = clearancesTable[selectedVoltage];
+
+        if (isCableBox && voltage > 36) {
+          clearancesTable = minimumClearances;
+          const voltageKeys = Object.keys(clearancesTable).map(Number).sort((a, b) => a - b);
+          selectedVoltage = voltageKeys[0];
+          for (let i = 0; i < voltageKeys.length; i++) {
+            if (voltageKeys[i] <= voltage) {
+              selectedVoltage = voltageKeys[i];
+            } else {
+              break;
+            }
+          }
+          clearanceData = clearancesTable[selectedVoltage];
+        }
+
+        // If BIL is provided and the voltage has BIL-specific clearances, use them
+        if (bil && clearanceData && typeof clearanceData === 'object' && clearanceData[bil]) {
+          return clearanceData[bil];
+        } else if (clearanceData && clearanceData.default) {
+          // For 145 kV, return default if bil is null
+          return clearanceData.default;
+        }
+
+        return clearanceData;
+      }
+
+      let indexInput=1;
+      let indexOutput=1;
+      // Auto-set impedance when kVA changes
+      React.useEffect(() => {
+        const kva = formData.kvaList.length > 0 ? Math.max(...formData.kvaList) : parseFloat(formData.kva);
+        if (!isNaN(kva) && kva > 0) {
+          const autoImpedance = getImpedanceForKva(kva);
+          setFormData(prev => {
+            if (
+              !prev.impedanceVoltage ||
+              prev.impedanceVoltage === '' ||
+              parseFloat(prev.impedanceVoltage) === parseFloat(getImpedanceForKva(kva))
+            ) {
+              return { ...prev, impedanceVoltage: autoImpedance.toString() };
+            }
+            return prev;
+          });
+        } else {
+          setFormData(prev => ({ ...prev, impedanceVoltage: '' }));
+        }
+      }, [formData.kvaList, formData.kva]);
+
+      // BIL options and logic for dropdowns (must be at top level, not in any function)
+      const bilOptionsTable = {
+        110: [
+          { impulse: 450, freq: 185 },
+          { impulse: 550, freq: 230 }
+        ],
+        132: [
+          { impulse: 550, freq: 230 },
+          { impulse: 650, freq: 275 }
+        ],
+        220: [
+          { impulse: 950, freq: 395 },
+          { impulse: 1050, freq: 460 }
+        ],
+        400: [
+          { impulse: 1300, freq: 570 },
+          { impulse: 1425, freq: 630 }
+        ]
+      };
+      function getFloorBILChoices(voltage) {
+        if (isNaN(voltage) || voltage < 110) return null;
+        const keys = Object.keys(bilOptionsTable).map(Number).sort((a, b) => a - b);
+        let floor = keys[0];
+        for (let i = 0; i < keys.length; i++) {
+          if (keys[i] <= voltage) floor = keys[i];
+        }
+        return bilOptionsTable[floor];
+      }
+      const hvVoltageNum = parseFloat(formData.hvVoltage);
+      const lvVoltageNum = parseFloat(formData.lvVoltage);
+      const hvBilChoices = getFloorBILChoices(hvVoltageNum);
+      const lvBilChoices = lvVoltageNum >= 1 ? getFloorBILChoices(lvVoltageNum) : null;
+
+      // Standard accessories/fittings list
+      const [editFittings, setEditFittings] = React.useState(false);
+      const [selectedFittings, setSelectedFittings] = React.useState(allStandardFittings);
+
+      // Add this helper function at the top level (outside App):
+      function getTapChangerText(type) {
+        if (!type) return '';
+        if (type === 'On Load Tap Changer') return 'On Load Tap Changer with RTCC Panel & AVR: 1 No.';
+        if (type === 'Off Circuit tap changer') return 'Off Circuit Tap Changer: 1 No.';
+        return type;
+      }
+
+      // Add a useEffect to clean up tap changer accessory when tapChangerType changes
+      React.useEffect(() => {
+        const onLoadText = getTapChangerText('On Load Tap Changer');
+        const offCircuitText = getTapChangerText('Off Circuit tap changer');
+        setSelectedFittings(prev => prev.filter(f => f !== onLoadText && f !== offCircuitText));
+        setFittingQuantities(prev => {
+          const newQuantities = { ...prev };
+          delete newQuantities[onLoadText];
+          delete newQuantities[offCircuitText];
+          return newQuantities;
+        });
+      }, [formData.tapChangerType]);
+
+      return (
+        <div className="container mx-auto p-4 max-w-6xl">
+          <div className="logo-header flex flex-wrap items-center justify-center mb-8 space-x-4">
+            <img
+              src="https://images.squarespace-cdn.com/content/v1/67c6cd6aa7237560f57b1238/5dc6f094-8e85-4639-9c96-e5aa5e773ec0/BCS-Mahati-with-C_TM-revised-02.png?format=1500w"
+              alt="Company Logo"
+              className="h-20 max-w-full object-contain"
+            />
+            <h1 className="text-3xl font-bold text-blue-800">
+              Distribution Transformer
+            </h1>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+
+            <h2 className="text-xl font-bold mb-4 text-center">ANNEXURE – {formData.annexureNumber}</h2>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              TECHNICAL PARTICULARS FOR DISTRIBUTION TRANSFORMER
+            </h3>
+            <div className="flex justify-end mb-2 gap-4">
+               <label className="flex items-center gap-2">
+               <span className="font-semibold">Annexure No.:</span>
+                 <input
+                  type="text"
+                  name="annexureNumber"
+                  value={formData.annexureNumber}
+                  onChange={handleInputChange}
+                  className="w-20 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="I"
+                 />
+                </label>
+               <label className="flex items-center gap-2">
+               <span className="font-semibold">Revision No.:</span>
+                 <input
+                  type="number"
+                  min="1"
+                  value={registerOutput}
+                  onChange={e => setRegisterOutput(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="w-20 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="n"
+                 />
+                </label>
+              </div>
+            <table className="w-full border-collapse border border-gray-300 text-sm">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-4">Sr. No.</th>
+                  <th className="border border-gray-300 p-4">Description</th>
+                  <th className="border border-gray-300 p-4">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Name of the Manufacturer <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    <div className="w-full p-1 border rounded bg-gray-100 text-gray-800">{formData.manufacturer}</div>
+                    {errors.manufacturer && <div className="text-red-600 text-xs mt-1">{errors.manufacturer}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Customer</td>
+                  <td className="border border-gray-300 p-4">
+                    <input
+                      type="text"
+                      name="customer"
+                      value={formData.customer}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="(Optional)"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Number of Transformers <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    <input
+                      type="number"
+                      name="numberOfTransformers"
+                      value={formData.numberOfTransformers}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      min="1"
+                      placeholder="Enter number of transformers"
+                    />
+                    {errors.numberOfTransformers && <div className="text-red-600 text-xs mt-1">{errors.numberOfTransformers}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Reference Standards <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span>{formData.referenceStandards}</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="referenceStandards"
+                        value={formData.referenceStandards}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="IS:1180">IS:1180</option>
+                        <option value="IS:2026">IS:2026</option>
+                      </select>
+                    </div>
+                    {errors.referenceStandards && <div className="text-red-600 text-xs mt-1">{errors.referenceStandards}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Service <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span>{formData.service}</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="service"
+                        value={formData.service}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="Outdoor">Outdoor</option>
+                        <option value="Indoor">Indoor</option>
+                        <option value="Indoor/Outdoor">Indoor/Outdoor</option>
+                      </select>
+                    </div>
+                    {errors.service && <div className="text-red-600 text-xs mt-1">{errors.service}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">KVA (enter in kVA) <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    <div className="flex gap-2 mb-2">
+                    <input
+                      type="number"
+                        name="kvaInput"
+                        value={kvaInput}
+                        onChange={e => setKvaInput(e.target.value)}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                        placeholder="Enter kVA"
+                    />
+                    {errors.kva && <div className="text-red-600 text-xs mt-1">{errors.kva}</div>}
+                      <button
+                        type="button"
+                        onClick={handleAddKva}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div>
+                      {formData.kvaList.map((kva, idx) => (
+                        <div key={kva} className="flex items-center mb-1">
+                          <span className="font-bold mr-2">{kva} kVA</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveKva(kva)}
+                            className="text-red-500 hover:underline ml-2"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Rated Voltage (enter in kV): <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    HV (No Load): <input
+                      type="number"
+                      name="hvVoltage"
+                      value={formData.hvVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                      placeholder="e.g., 200 for 200 kV"
+                    />
+                    {errors.hvVoltage && <div className="text-red-600 text-xs mt-1">{errors.hvVoltage}</div>}
+                    {hvBilChoices && (
+                      <div className="mt-2">
+                        <label className="block text-xs text-gray-700 mb-1">Select Lightning Impulse (BIL) for HV:</label>
+                        <div className="text-xs text-gray-500 mb-1">Note: Enter voltage in kV (e.g., 200 for 200 kV)</div>
+                        <select
+                          value={selectedHvBil ? selectedHvBil.impulse : ''}
+                          onChange={e => {
+                            const val = parseInt(e.target.value);
+                            setSelectedHvBil(hvBilChoices.find(opt => opt.impulse === val));
+                          }}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select BIL</option>
+                          {hvBilChoices.map(opt => (
+                            <option key={opt.impulse} value={opt.impulse}>{opt.impulse} kVp</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <br />
+                    LV (No Load): <input
+                      type="number"
+                      name="lvVoltage"
+                      value={formData.lvVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                      placeholder="e.g., 0.433 for 0.433 kV"
+                    />
+                    {errors.lvVoltage && <div className="text-red-600 text-xs mt-1">{errors.lvVoltage}</div>}
+                    {lvBilChoices && (
+                      <div className="mt-2">
+                        <label className="block text-xs text-gray-700 mb-1">Select Lightning Impulse (BIL) for LV:</label>
+                        <div className="text-xs text-gray-500 mb-1">Note: Enter voltage in kV (e.g., 0.433 for 0.433 kV)</div>
+                        <select
+                          value={selectedLvBil ? selectedLvBil.impulse : ''}
+                          onChange={e => {
+                            const val = parseInt(e.target.value);
+                            setSelectedLvBil(lvBilChoices.find(opt => opt.impulse === val));
+                          }}
+                          className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select BIL</option>
+                          {lvBilChoices.map(opt => (
+                            <option key={opt.impulse} value={opt.impulse}>{opt.impulse} kVp</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Rated Frequency <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span>{formData.frequency} Hz</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="frequency"
+                        value={formData.frequency}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="50">50 Hz</option>
+                        <option value="60">60 Hz</option>
+                      </select>
+                    </div>
+                    {errors.frequency && <div className="text-red-600 text-xs mt-1">{errors.frequency}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">No. of Phases <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span>{formData.phases} {formData.phases === '1' ? 'Phase' : 'Phases'}</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="phases"
+                        value={formData.phases}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="1">1 Phase</option>
+                        <option value="3">3 Phases</option>
+                      </select>
+                    </div>
+                    {errors.phases && <div className="text-red-600 text-xs mt-1">{errors.phases}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Connections <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    HV Winding: <div className="relative">
+                      <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1 cursor-pointer flex justify-between items-center">
+                        <span>{formData.hvConnection}</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <select
+                          name="hvConnection"
+                          value={formData.hvConnection}
+                          onChange={handleInputChange}
+                          className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                        >
+                          <option value="Delta">Delta</option>
+                          <option value="Star with Neutral">Star with Neutral</option>
+                          <option value="Star">Star</option>
+                          <option value="Zigzag">Zigzag</option>
+                          <option value="Auto">Auto</option>
+                        </select>
+                      </div>
+                    </div><br />
+                    LV Winding: <div className="relative">
+                      <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                        <span>{formData.lvConnection}</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <select
+                          name="lvConnection"
+                          value={formData.lvConnection}
+                          onChange={handleInputChange}
+                          className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                        >
+                          <option value="Star with Neutral">Star with Neutral</option>
+                          <option value="Delta">Delta</option>
+                          <option value="Star both with Neutral">Star both with Neutral</option>
+                          <option value="Zigzag">Zigzag</option>
+                          <option value="Auto">Auto</option>
+                        </select>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Connection Symbol <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span>{formData.vectorGroup}</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="vectorGroup"
+                        value={formData.vectorGroup}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="Dyn11">Dyn11</option>
+                        <option value="Dd0">Dd0</option>
+                        <option value="Dd6">Dd6</option>
+                        <option value="YNd1">YNd1</option>
+                        <option value="YNd11">YNd11</option>
+                        <option value="YNyn0">YNyn0</option>
+                        <option value="Dzn0">Dzn0</option>
+                        <option value="Ya0">Ya0</option>
+                      </select>
+                    </div>
+                    {errors.vectorGroup && <div className="text-red-600 text-xs mt-1">{errors.vectorGroup}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Type of Tap Changer <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    Type: <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1 cursor-pointer flex justify-between items-center"
+                      onClick={() => setShowTapChangerTypeDropdown(!showTapChangerTypeDropdown)}
+                    >
+                      <span className={formData.tapChangerType ? "" : "text-gray-400"}>
+                        {formData.tapChangerType || "Select Type"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    {showTapChangerTypeDropdown && (
+                      <div className="absolute z-10 w-[calc(100%-2rem)] mt-1 bg-white border border-gray-300 rounded shadow-lg">
+                        {['On Load Tap Changer', 'Off Circuit tap changer'].map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.tapChangerType === option ? 'bg-blue-100' : ''
+                            }`}
+                            onClick={() => {
+                              handleInputChange({ target: { name: 'tapChangerType', value: option } });
+                              setShowTapChangerTypeDropdown(false);
+                            }}
+                          >
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}{errors.tapChangerType && <div className="text-red-600 text-xs mt-1">{errors.tapChangerType}</div>}
+                    <br />
+                    Make: <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1 cursor-pointer flex justify-between items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowTapChangerMakeDropdown(!showTapChangerMakeDropdown);
+                      }}
+                    >
+                      <span className={formData.tapChangerMake ? "" : "text-gray-400"}>
+                        {formData.tapChangerMake || "Select Make"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    {showTapChangerMakeDropdown && (
+                      <div
+                        className="absolute z-10 w-[calc(100%-2rem)] mt-1 bg-white border border-gray-300 rounded shadow-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {(formData.tapChangerType === 'On Load Tap Changer' ? onLoadTapChangerMakes : offLoadTapChangerMakes).map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 flex items-center ${
+                              formData.tapChangerMake?.includes(option) ? 'bg-blue-100' : ''
+                            }`}
+                            onClick={() => handleTapChangerMakeChange(option)}
+                          >
+                            <div className="w-4 h-4 border border-gray-400 rounded mr-2 flex items-center justify-center">
+                              {formData.tapChangerMake?.includes(option) && (
+                                <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {formData.tapChangerMake?.includes('Customize') && (
+                      <input
+                        type="text"
+                        name="customTapChangerMake"
+                        value={customTapChangerMake}
+                        onChange={handleCustomInputChange}
+                        placeholder="Enter custom make"
+                        className="w-full p-1 border rounded mt-2"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )}
+                    {errors.tapChangerMake && <div className="text-red-600 text-xs mt-1">{errors.tapChangerMake}</div>}
+                    <br />
+                    Tapping Range: <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1 cursor-pointer flex justify-between items-center"
+                      onClick={() => setShowTappingRangeDropdown(!showTappingRangeDropdown)}
+                    >
+                      <span className={formData.tappingRange ? "" : "text-gray-400"}>
+                        {formData.tappingRange || "Select Tapping Range"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    {showTappingRangeDropdown && (
+                      <div className="absolute z-10 w-[calc(100%-2rem)] mt-1 bg-white border border-gray-300 rounded shadow-lg">
+                        {(formData.tapChangerType === 'On Load Tap Changer' ? onLoadTappingRanges : offLoadTappingRanges).map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.tappingRange === option ? 'bg-blue-100' : ''
+                            }`}
+                            onClick={() => {
+                              handleInputChange({ target: { name: 'tappingRange', value: option } });
+                              setShowTappingRangeDropdown(false);
+                            }}
+                          >
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}{errors.tappingRange && <div className="text-red-600 text-xs mt-1">{errors.tappingRange}</div>}
+                    <br />
+                    No. of Steps / Position: <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center"
+                      onClick={() => setShowTapStepsDropdown(!showTapStepsDropdown)}
+                    >
+                      <span className={formData.tapSteps ? "" : "text-gray-400"}>
+                        {formData.tapSteps || "Select Number of Steps"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    {showTapStepsDropdown && (
+                      <div className="absolute z-10 w-[calc(100%-2rem)] mt-1 bg-white border border-gray-300 rounded shadow-lg">
+                        {(formData.tapChangerType === 'On Load Tap Changer' ? onLoadTapSteps : offLoadTapSteps).map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 ${
+                              formData.tapSteps === option ? 'bg-blue-100' : ''
+                            }`}
+                            onClick={() => {
+                              handleInputChange({ target: { name: 'tapSteps', value: option } });
+                              setShowTapStepsDropdown(false);
+                            }}
+                          >
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}{errors.tapSteps && <div className="text-red-600 text-xs mt-1">{errors.tapSteps}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Type of Cooling <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCoolingDropdown(!showCoolingDropdown);
+                      }}
+                    >
+                      <span className={formData.coolingType.length > 0 ? "" : "text-gray-400"}>
+                        {formData.coolingType.length > 0 ? formData.coolingType.join(', ') : "Select Type"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                    {showCoolingDropdown && (
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {['ONAN', 'OFWF', 'OFAF', 'ONAF', 'AN', 'ANAF'].map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 flex items-center ${
+                              formData.coolingType.includes(option) ? 'bg-blue-100' : ''
+                            }`}
+                            onClick={() => handleCoolingTypeChange(option)}
+                          >
+                            <div className="w-4 h-4 border border-gray-400 rounded mr-2 flex items-center justify-center">
+                              {formData.coolingType.includes(option) && (
+                                <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {errors.coolingType && <div className="text-red-600 text-xs mt-1">{errors.coolingType}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Temperature Rise Above Ambient <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    Ambient (enter in °C): <input
+                      type="number"
+                      name="ambient"
+                      value={formData.ambient}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    />{errors.ambient && <div className="text-red-600 text-xs mt-1">{errors.ambient}</div>}<br />
+                    a) Oil (enter in °C): <input
+                      type="number"
+                      name="topOilTemp"
+                      value={formData.topOilTemp}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                      step="any"
+                    />{errors.topOilTemp && <div className="text-red-600 text-xs mt-1">{errors.topOilTemp}</div>}<br />
+                    b) Winding (enter in °C): <input
+                      type="number"
+                      name="windingTemp"
+                      value={formData.windingTemp}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="any"
+                    />{errors.windingTemp && <div className="text-red-600 text-xs mt-1">{errors.windingTemp}</div>}
+                  </td>
+                </tr>
+                {formData.referenceStandards === 'IS:1180' && (
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexInput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Energy Efficiency Level <span className="text-red-600">*</span></td>
+                    <td className="border border-gray-300 p-4 relative">
+                      <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                        <span className={formData.energyEfficiencyLevel ? "" : "text-gray-400"}>
+                          {formData.energyEfficiencyLevel ? `Level ${formData.energyEfficiencyLevel.slice(-1)}` : "Select Level"}
+                        </span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <select
+                          name="energyEfficiencyLevel"
+                          value={formData.energyEfficiencyLevel}
+                          onChange={handleInputChange}
+                          className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                        >
+                          <option value="level1">Level 1</option>
+                          <option value="level2">Level 2</option>
+                          <option value="level3">Level 3</option>
+                          <option value="level4">Level 4</option>
+                          <option value="level5">Level 5</option>
+                        </select>
+                        {errors.energyEfficiencyLevel && <div className="text-red-600 text-xs mt-1">{errors.energyEfficiencyLevel}</div>}
+                      </div>
+                      {errors.energyEfficiencyLevel && <div className="text-red-600 text-xs mt-1">{errors.energyEfficiencyLevel}</div>}
+                    </td>
+                  </tr>
+                )}
+                {formData.referenceStandards === 'IS:2026' && (
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexInput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">No Load Losses (enter in W) <span className="text-red-600">*</span></td>
+                    <td className="border border-gray-300 p-4">
+                      <input
+                        type="number"
+                        name="noLoadLosses"
+                        value={formData.noLoadLosses}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="any"
+                      />
+                      {errors.noLoadLosses && <div className="text-red-600 text-xs mt-1">{errors.noLoadLosses}</div>}
+                    </td>
+                  </tr>
+                )}
+                {formData.referenceStandards === 'IS:2026' && (
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexInput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Load Losses (enter in W) <span className="text-red-600">*</span></td>
+                    <td className="border border-gray-300 p-4">
+                      <input
+                        type="number"
+                        name="loadLosses"
+                        value={formData.loadLosses}
+                        onChange={handleInputChange}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="any"
+                      />
+                      {errors.loadLosses && <div className="text-red-600 text-xs mt-1">{errors.loadLosses}</div>}
+                    </td>
+                  </tr>
+                )}
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Impedance Voltage (enter in %) <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    <input
+                      type="text"
+                      name="impedanceVoltage"
+                      value={formData.impedanceVoltage}
+                      onChange={handleInputChange}
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {errors.impedanceVoltage && <div className="text-red-600 text-xs mt-1">{errors.impedanceVoltage}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Insulation Class <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center">
+                      <span className={formData.insulationClass ? "" : "text-gray-400"}>
+                        {formData.insulationClass || "Select Class"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <select
+                        name="insulationClass"
+                        value={formData.insulationClass}
+                        onChange={handleInputChange}
+                        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                      >
+                        <option value="" disabled>Select Class</option>
+                        <option value="A class">A class</option>
+                        <option value="F class">F class</option>
+                        <option value="H class">H class</option>
+                      </select>
+                    </div>
+                    {errors.insulationClass && <div className="text-red-600 text-xs mt-1">{errors.insulationClass}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Terminal Arrangement <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    a) High Voltage:
+                    <div className="relative mb-2">
+                      <div
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowHvTerminalDropdown(!showHvTerminalDropdown);
+                        }}
+                      >
+                        <span className={formData.hvTerminal.length > 0 ? "" : "text-gray-400"}>
+                          {formData.hvTerminal.length > 0 ? formData.hvTerminal.join(', ') : "Select HV Terminal"}
+                        </span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {showHvTerminalDropdown && (
+                        <div
+                          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {['Bare Bushing', 'Cable Box', 'Bus Duct'].map((option) => (
+                            <div
+                              key={option}
+                              className={`p-2 cursor-pointer hover:bg-blue-50 flex items-center ${formData.hvTerminal.includes(option) ? 'bg-blue-100' : ''}`}
+                              onClick={() => handleHvTerminalChange(option)}
+                            >
+                              <div className="w-4 h-4 border border-gray-400 rounded mr-2 flex items-center justify-center">
+                                {formData.hvTerminal.includes(option) && (
+                                  <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    b) Lower Voltage:
+                    <div className="relative">
+                      <div
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowLvTerminalDropdown(!showLvTerminalDropdown);
+                        }}
+                      >
+                        <span className={formData.lvTerminal.length > 0 ? "" : "text-gray-400"}>
+                          {formData.lvTerminal.length > 0 ? formData.lvTerminal.join(', ') : "Select LV Terminal"}
+                        </span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {showLvTerminalDropdown && (
+                        <div
+                          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {['Bare Bushing', 'Cable Box', 'Bus Duct'].map((option) => (
+                            <div
+                              key={option}
+                              className={`p-2 cursor-pointer hover:bg-blue-50 flex items-center ${formData.lvTerminal.includes(option) ? 'bg-blue-100' : ''}`}
+                              onClick={() => handleLvTerminalChange(option)}
+                            >
+                              <div className="w-4 h-4 border border-gray-400 rounded mr-2 flex items-center justify-center">
+                                {formData.lvTerminal.includes(option) && (
+                                  <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {errors.hvTerminal && <div className="text-red-600 text-xs mt-1">{errors.hvTerminal}</div>}
+                    {errors.lvTerminal && <div className="text-red-600 text-xs mt-1">{errors.lvTerminal}</div>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Paint <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4 relative">
+                    <div
+                      className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex justify-between items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPaintDropdown(!showPaintDropdown);
+                      }}
+                    >
+                      <span className={formData.paint.length > 0 ? "" : "text-gray-400"}>
+                        {formData.paint.length > 0 ? formData.paint.join(', ') : "Select Paint"}
+                      </span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div> 
+                    {showPaintDropdown && (
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {['631-Light grey(as per IS:5)', '632- Dark Grey', 'RAL 7032', 'Customize'].map((option) => (
+                          <div
+                            key={option}
+                            className={`p-2 cursor-pointer hover:bg-blue-50 flex items-center ${formData.paint.includes(option) ? 'bg-blue-100' : ''}`}
+                            onClick={() => handlePaintChange(option)}
+                          >
+                            <div className="w-4 h-4 border border-gray-400 rounded mr-2 flex items-center justify-center">
+                              {formData.paint.includes(option) && (
+                                <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            {option}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                     {formData.paint.includes('Customize') && (
+                        <input
+                            type="text"
+                            name="customPaint"
+                            value={customPaint}
+                            onChange={handleCustomInputChange}
+                            placeholder="Enter custom paint shade"
+                            className="w-full p-1 border rounded mt-2"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    )}
+                    {errors.paint && <div className="text-red-600 text-xs mt-1">{errors.paint}</div>}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {Object.values(errors).length > 0 && (
+              <div className="mt-2 mb-4 p-2 font-bold bg-red-100 text-red-800 border border-red-300 rounded text-center text-sm">
+                Some fields are missing input.
+              </div>
+            )}
+            <div className="mt-4">
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                className="form-checkbox h-5 w-5 text-blue-600"
+                checked={showAdditionalDetails}
+                onChange={handleCheckboxChange}
+              />
+              <span className="ml-2 text-gray-700">Enter Additional Weight/Dimensions</span>
+            </label>
+          </div>
+          {showAdditionalDetails && (
+            <table className="w-full border-collapse border border-gray-300 text-sm mt-4">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-4">Sr. No.</th>
+                  <th className="border border-gray-300 p-4">Description</th>
+                  <th className="border border-gray-300 p-4">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-4">1</td>
+                  <td className="border border-gray-300 p-4 font-bold">Dimensions <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    a) Length (enter in mm): <input type="text" name="length" value={formData.length} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    b) Width (enter in mm): <input type="text" name="width" value={formData.width} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    c) Height (enter in mm): <input type="text" name="height" value={formData.height} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4">2</td>
+                  <td className="border border-gray-300 p-4 font-bold">Weight Details <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    a) Core & Windings (enter in kg): <input type="text" name="coreWindingsWeight" value={formData.coreWindingsWeight} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    b) Tank & Fittings (enter in kg): <input type="text" name="tankFittingsWeight" value={formData.tankFittingsWeight} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    c) Oil Mass (enter in kg): <input type="text" name="oilMass" value={formData.oilMass} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    d) Oil Mass (Enter in litre): <input type="text" name="oilMassLitre" value={formData.oilMassLitre} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1" />
+                    <br />
+                    e) Total Weight (in kg): <input type="text" name="totalWeight" value={formData.totalWeight} readOnly className="w-full p-1 border rounded bg-gray-100 text-gray-800 focus:outline-none" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+            <div className="mt-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-blue-600"
+                  checked={editFittings}
+                  onChange={e => {
+                    const checked = e.target.checked;
+                    setEditFittings(checked);
+                    if (checked) {
+                      setSelectedFittings(allStandardFittings); // all selected by default
+                    } else {
+                      setSelectedFittings(allStandardFittings); // keep all selected when not editing
+                    }
+                  }}
+                />
+
+                <span className="ml-2 text-gray-700">Edit list of Fittings/Accessories</span>
+              </label>
+            </div>
+            {editFittings && (
+              <div className="mt-4 p-4 border rounded-lg max-h-96 overflow-y-auto bg-gray-50">
+                <div className="font-semibold mb-2">Select Standard Fittings/Accessories:</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {allStandardFittings.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFittings.includes(item)}
+                        onChange={() => {
+                          if (selectedFittings.includes(item)) {
+                            setSelectedFittings(selectedFittings.filter(f => f !== item));
+                          } else {
+                            setSelectedFittings([...selectedFittings, item]);
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <span>{item}</span>
+                      {selectedFittings.includes(item) && (
+                        <input
+                          type="text"
+                          value={fittingQuantities[item] || ''}
+              onChange={e => {
+                const val = e.target.value;
+                setFittingQuantities(q => ({ ...q, [item]: val }));
+              }}
+                          className="w-16 ml-2 p-1 border rounded"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {formData.tapChangerType && (
+                  <div className="flex items-center gap-2 bg-blue-50 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      disabled={true}
+                      className="mr-2"
+                    />
+                    <span className="font-medium">{getTapChangerText(formData.tapChangerType)}</span>
+                    <input
+                      type="text"
+                 value={fittingQuantities[getTapChangerText(formData.tapChangerType)] || ''}
+                onChange={e => {
+                const val = e.target.value;
+                setFittingQuantities(q => ({ ...q, [getTapChangerText(formData.tapChangerType)]: val }));
+                    }}
+                      className="w-16 ml-2 p-1 border rounded"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    className="form-checkbox h-5 w-5 text-blue-600"
+                    checked={showAdditionalFittings}
+                    onChange={(e) => setShowAdditionalFittings(e.target.checked)}
+                  />
+                  <span className="ml-2 text-gray-700">Enter Additional Fittings/Accessories</span>
+                </label>
+              </div>
+
+              {showAdditionalFittings && (
+                <div className="mt-4 p-4 border rounded-lg">
+                  <div className="flex gap-2 mb-4">
+                    <input
+                      type="text"
+                      value={newFitting}
+                      onChange={e => setNewFitting(e.target.value)}
+                      placeholder="Enter fitting/accessory"
+                      className="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+
+                      value={newFittingQty}
+                      onChange={e => setNewFittingQty((e.target.value) || '')}
+                      className="w-16 p-2 border rounded"
+                      placeholder="Qty"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newFitting.trim()) {
+                          setAdditionalFittings(prev => [...prev, { desc: newFitting.trim(), qty: newFittingQty }]);
+                          setNewFitting('');
+                          setNewFittingQty(1);
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {additionalFittings.map((fitting, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <span>{fitting.desc}</span>
+                        <input
+                          type="text"
+                          value={fitting.qty}
+                          onChange={e => {
+                            const val = (e.target.value) || 1;
+                            setAdditionalFittings(prev => prev.map((f, i) => i === index ? { ...f, qty: val } : f));
+                          }}
+                          className="w-16 ml-2 p-1 border rounded"
+                        />
+                        <button
+                          onClick={() => setAdditionalFittings(prev => prev.filter((_, i) => i !== index))}
+                          className="text-red-600 hover:text-red-800 ml-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+
+
+
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={calculateParameters}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Calculate Parameters
+            </button>
+          </div>
+
+          {report && (
+
+            <div id="report-section" className="bg-white p-6 rounded-lg shadow-md mt-6">
+              <div className="relative mb-6">
+               <div className="flex justify-center">
+                 <img
+                  src="https://images.squarespace-cdn.com/content/v1/67c6cd6aa7237560f57b1238/5dc6f094-8e85-4639-9c96-e5aa5e773ec0/BCS-Mahati-with-C_TM-revised-02.png?format=1500w"
+                  alt="Company Logo"
+                  className="h-16 max-w-full object-contain"
+                 />
+               </div>
+                  {registerOutput && (
+                    <div className="absolute top-0 right-0 text-2xl font-bold text-blue-700">
+                        REV -{registerOutput}
+                  </div>
+                    )}<h2 className="text-xl font-bold mt-2 mb-4 text-center">ANNEXURE – {report.annexureNumber}</h2>
+                      <h3 className="text-lg font-semibold mb-4 text-center">
+                      TECHNICAL PARTICULARS FOR DISTRIBUTION TRANSFORMER
+                </h3>
+              </div>
+              <table className="w-full border-collapse border border-gray-300 text-sm">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="border border-gray-300 p-4">Sr. No.</th>
+                    <th className="border border-gray-300 p-4">Description</th>
+                    <th className="border border-gray-300 p-4">Particulars</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Name of the Manufacturer</td>
+                    <td className="border border-gray-300 p-4">{report.manufacturer}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Service</td>
+                    <td className="border border-gray-300 p-4">{report.service}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">KVA</td>
+                    <td className="border border-gray-300 p-4">
+                      {report.kvaList && report.kvaList.length > 0 ? (
+                        report.kvaList.map((kva, idx) => (
+                          <span key={kva}>
+                            {kva} kVA{idx < report.kvaList.length - 1 ? ', ' : ''}
+                          </span>
+                        ))
+                      ) : (
+                        `${report.kva} kVA`
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4 ">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Number of Transformer Required</td>
+                    <td className="border border-gray-300 p-4">{report.numberOfTransformers}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Rated Voltage</td>
+                    <td className="border border-gray-300 p-4">
+                      HV (No Load): {parseFloat(report.hvVoltage).toFixed(3) } kV<br />
+                      LV (No Load): {parseFloat(report.lvVoltage).toFixed(3) } kV
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Rated Current</td>
+                    <td className="border border-gray-300 p-4">
+                      HV Winding: {report.hvCurrent} A<br />
+                      LV Winding: {report.lvCurrent} A
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Rated Frequency</td>
+                    <td className="border border-gray-300 p-4">{report.frequency} Hz</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">No. of Phases</td>
+                    <td className="border border-gray-300 p-4">{report.phases} {report.phases === '1' ? 'Phase' : 'Phases'}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Connections</td>
+                    <td className="border border-gray-300 p-4">
+                      HV Winding: {report.hvConnection}<br />
+                      LV Winding: {report.lvConnection}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Connection Symbol</td>
+                    <td className="border border-gray-300 p-4">{report.vectorGroup}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Type of Tap Changer</td>
+                    <td className="border border-gray-300 p-4">
+                      Type: {report.tapChangerType}<br />
+                      Make: {report.tapChangerMake}<br />
+                      Tapping Range: {report.tappingRange}<br />
+                      No. of Steps / Position: {report.tapSteps}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Type of Cooling</td>
+                    <td className="border border-gray-300 p-4">{report.coolingType.join(', ')}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Temperature Rise Above Ambient</td>
+                    <td className="border border-gray-300 p-4">
+                      Ambient: {report.ambient || 'N/A'} °C<br />
+                      a) Top Oil: {report.topOilTemp} °C<br />
+                      b) Windings: {report.windingTemp} °C
+                    </td>
+                  </tr>
+                  {report.referenceStandards === 'IS:1180' && (
+                    <tr>
+                      <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                      <td className="border border-gray-300 p-4 font-bold">Having losses complying to IS:1180-2021 Energy Efficiency Level-{report.energyEfficiencyLevel ? report.energyEfficiencyLevel.slice(-1) : 'I'}</td>
+                      <td className="border border-gray-300 p-4">
+                        Max. losses at 100% load: {report.maxLosses100} kW (Max.)<br />
+                        Max. losses at 50% load: {report.maxLosses50} kW (Max.)
+                      </td>
+                    </tr>
+                  )}
+                  {report.referenceStandards === 'IS:2026' && (
+                    <tr>
+                      <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                      <td className="border border-gray-300 p-4 font-bold">Losses</td>
+                      <td className="border border-gray-300 p-4">
+                        No Load Losses: {report.noLoadLosses} kW<br />
+                        Load Losses: {report.loadLosses} kW
+                      </td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Impedance voltage at rated current for the principal tapping (HV-LV)</td>
+                    <td className="border border-gray-300 p-4">{report.impedanceVoltage}% (IS Tol.)</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Insulation Class</td>
+                    <td className="border border-gray-300 p-4">{report.insulationClass}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Basic Insulation Level</td>
+                    <td className="border border-gray-300 p-4">
+                      a) Separate source power frequency voltage withstand:<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(i) HV Winding: {report.hvPowerFreq} kV rms<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(ii) LV Winding: {report.lvPowerFreq} kV rms<br />
+                      b) Induced Over voltage withstand Voltage:<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(i) HV Winding: {report.hvInduced} kV rms<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(ii) LV Winding: {report.lvInduced} kV rms<br />
+                      c) Full wave lightning Impulse withstand Voltage:<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(i) HV Winding: {report.hvImpulse} kVp<br />
+                      &nbsp;&nbsp;&nbsp;&nbsp;(ii) LV Winding: {report.lvImpulse} kVp<br />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Terminal Arrangement</td>
+                    <td className="border border-gray-300 p-4">
+                      a) High Voltage: {Array.isArray(report.hvTerminal) ? report.hvTerminal.join(', ') : report.hvTerminal}<br />
+                      b) Lower Voltage: {Array.isArray(report.lvTerminal) ? report.lvTerminal.join(', ') : report.lvTerminal}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Paint</td>
+                    <td className="border border-gray-300 p-4">{report.paint}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Reference Standards</td>
+                    <td className="border border-gray-300 p-4">{report.referenceStandards}</td>
+                  </tr>
+
+                  {report.referenceStandards === 'IS:2026' && (
+                    <>
+                      <tr>
+                        <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                        <td className="border border-gray-300 p-4 font-bold">Efficiency & Regulation</td>
+                        <td className="border border-gray-300 p-4">
+                          <table className="w-full border border-gray-300 text-xs">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="border border-gray-300 p-2">Load / Power Factor</th>
+                                <th className="border border-gray-300 p-2">100% Load</th>
+                                <th className="border border-gray-300 p-2">75% Load</th>
+                                <th className="border border-gray-300 p-2">50% Load</th>
+                                <th className="border border-gray-300 p-2">25% Load</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Efficiency at Unity PF</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency100}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency75}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency50}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency25}%</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Efficiency at 0.8 PF</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency100_08pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency75_08pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency50_08pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency25_08pf}%</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Efficiency at 0.85 PF</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency100_085pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency75_085pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency50_085pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency25_085pf}%</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Efficiency at 0.9 PF</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency100_09pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency75_09pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency50_09pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency25_09pf}%</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Efficiency at 0.95 PF</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency100_095pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency75_095pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency50_095pf}%</td>
+                                <td className="border border-gray-300 p-2">{report.efficiency25_095pf}%</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 p-2 font-semibold">Regulation (at 100% Load)</td>
+                                <td className="border border-gray-300 p-2">{calculateRegulation(100, 0.8)}%</td>
+                                <td className="border border-gray-300 p-2">{calculateRegulation(100, 0.85)}%</td>
+                                <td className="border border-gray-300 p-2">{calculateRegulation(100, 0.9)}%</td>
+                                <td className="border border-gray-300 p-2">{calculateRegulation(100, 0.95)}%</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                  <tr>
+                    <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                    <td className="border border-gray-300 p-4 font-bold">Minimum Clearances</td>
+                    <td className="border border-gray-300 p-4">
+                      <table className="w-full border border-gray-300 text-xs">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="border border-gray-300 p-2">Winding</th>
+                            <th className="border border-gray-300 p-2">Phase to Phase</th>
+                            <th className="border border-gray-300 p-2">Phase to Earth</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 p-2">HV</td>
+                            <td className="border border-gray-300 p-2">{report.hvClearances?.phaseToPhase || 0} mm</td>
+                            <td className="border border-gray-300 p-2">{report.hvClearances?.phaseToEarth || 0} mm</td>
+                          </tr>
+                          <tr>
+                            <td className="border border-gray-300 p-2">LV</td>
+                            <td className="border border-gray-300 p-2">{report.lvClearances?.phaseToPhase || 0} mm</td>
+                            <td className="border border-gray-300 p-2">{report.lvClearances?.phaseToEarth || 0} mm</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </td>
+                  </tr>
+                  {showAdditionalDetails && (
+                    <>
+                      <tr>
+                        <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                        <td className="border border-gray-300 p-4 font-bold">Dimensions</td>
+                        <td className="border border-gray-300 p-4">
+                          a) Length: {report.length} mm<br />
+                          b) Width: {report.width} mm<br />
+                          c) Height: {report.height} mm
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="border border-gray-300 p-4">{indexOutput++}</td>
+                        <td className="border border-gray-300 p-4 font-bold">Weight Details</td>
+                        <td className="border border-gray-300 p-4">
+                          a) Core & Windings: {report.coreWindingsWeight} kg<br />
+                          b) Tank & Fittings: {report.tankFittingsWeight} kg<br />
+                          c) Oil Mass(in kg): {report.oilMass} kg<br />
+                          d) Oil Mass(in litre): {report.oilMassLitre} litre<br />
+                          d) Total Weight: {report.totalWeight} kg
+                        </td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+              </table>
+              <h2 className="text-xl font-bold mt-8 mb-4 text-center page-break">ANNEXURE – II</h2>
+              <h3 className="text-lg font-semibold mb-4 text-center">
+                LIST OF FITTINGS & ACCESSORIES FOR DISTRIBUTION TRANSFORMER
+                {report.tapChangerType === 'On Load Tap Changer' && ' WITH ON LOAD TAP CHANGER (OLTC)'}
+                {report.tapChangerType === 'Off Circuit tap changer' && ' WITH Off Circuit tap changer (OCTC)'}
+              </h3>
+              <table className="w-full border-collapse border border-gray-300 text-sm mb-4">
+                <thead>
+                  <tr className="bg-blue-100">
+                    <th className="border border-gray-300 p-2">Sr. No.</th>
+                    <th className="border border-gray-300 p-2">Description</th>
+                    <th className="border border-gray-300 p-2">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ...(
+                      (report.selectedFittings && report.selectedFittings.length > 0 ? report.selectedFittings : allStandardFittings)
+                      .map(f => {
+                        let desc = f;
+                        if (f === 'HV Termination' && report.hvTerminal && report.hvTerminal.length > 0) {
+                          desc = `HV Termination - ${report.hvTerminal.join(', ')}`;
+                        } else if (f === 'LV Termination' && report.lvTerminal && report.lvTerminal.length > 0) {
+                          desc = `LV Termination - ${report.lvTerminal.join(', ')}`;
+                        }
+                        return { desc, qty: report.fittingQuantities?.[f] || 1 };
+                      })
+                    ),
+                    ...(report.additionalFittings || [])
+                  ].map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="border border-gray-300 p-2 text-center">{idx + 1}</td>
+                      <td className="border border-gray-300 p-2">{item.desc || item}</td>
+                      <td className="border border-gray-300 p-2 text-center">{item.qty || 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-4 flex justify-center print-button">
+                <button
+                  onClick={handleDownloadPDF}
+                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  Print  Report
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    root.render(<App />);
+  </script>
+</body>
+</html>

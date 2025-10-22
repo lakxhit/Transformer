@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Converter Transformer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom style for print view */
+    @media print {
+      body {
+        font-size: 10pt;
+      }
+      .container {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+      .bg-white, .shadow-md {
+        background: none;
+        box-shadow: none;
+      }
+      .p-6, .p-4, .p-2 {
+        padding: 0.5rem !important;
+      }
+      .flex-wrap, .space-x-4, .gap-4, .gap-2 {
+        display: block;
+        margin: 0;
+      }
+      .logo-header {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+      .h-20 {
+        height: 60px;
+      }
+      .no-print {
+        display: none !important;
+      }
+      /* Hide the input form in the print view */
+      .bg-white:not(#report-section) {
+        display: none;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      table, th, td {
+        border-color: #ccc !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+  // Initializing React root
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+
+  // Data for selectable BIL options for high voltages
+  const bilOptionsTable = {
+    110: [
+      { impulse: 450, freq: 185 },
+      { impulse: 550, freq: 230 }
+    ],
+    132: [
+      { impulse: 550, freq: 230 },
+      { impulse: 650, freq: 275 }
+    ],
+    220: [
+      { impulse: 950, freq: 395 },
+      { impulse: 1050, freq: 460 }
+    ],
+    400: [
+      { impulse: 1300, freq: 570 },
+      { impulse: 1425, freq: 630 }
+    ]
+  };
+
+  // Minimum Clearances Table
+  const minimumClearances = {
+    0: { phaseToPhase: 25, phaseToEarth: 20 },
+    1.1: { phaseToPhase: 30, phaseToEarth: 25 },
+    3.6: { phaseToPhase: 75, phaseToEarth: 60 },
+    7.2: { phaseToPhase: 120, phaseToEarth: 90 },
+    12: { phaseToPhase: 280, phaseToEarth: 140 },
+    24: { phaseToPhase: 330, phaseToEarth: 230 },
+    36: { phaseToPhase: 350, phaseToEarth: 320 },
+    52: { phaseToPhase: 530, phaseToEarth: 480 },
+    72.5: { phaseToPhase: 700, phaseToEarth: 660 },
+    145: {
+      default: { phaseToPhase: 1220, phaseToEarth: 1050 },
+      550: { phaseToPhase: 1220, phaseToEarth: 1050 },
+      650: { phaseToPhase: 1430, phaseToEarth: 1270 }
+    },
+    245: {
+      default: { phaseToPhase: 2000, phaseToEarth: 1800 },
+      950: { phaseToPhase: 2000, phaseToEarth: 1800 },
+      1050: { phaseToPhase: 2350, phaseToEarth: 2150 }
+    },
+    420: { phaseToPhase: 4000, phaseToEarth: 3500 },
+    800: { phaseToPhase: 6700, phaseToEarth: 5800 }
+  };
+
+  // Cable Box Clearances Table
+  const cableBoxClearances = {
+    0: { phaseToPhase: 25, phaseToEarth: 20 },
+    1.1: { phaseToPhase: 25, phaseToEarth: 20 },
+    3.6: { phaseToPhase: 50, phaseToEarth: 50 },
+    7.2: { phaseToPhase: 90, phaseToEarth: 70 },
+    12: { phaseToPhase: 130, phaseToEarth: 80 },
+    24: { phaseToPhase: 241, phaseToEarth: 140 },
+    36: { phaseToPhase: 351, phaseToEarth: 222 }
+  };
+
+  // Insulation Levels Table
+  const insulationLevels = {
+    1.1: {
+      hvPowerFreq: 3, hvInduced: "Twice to Rated Voltage", hvImpulse: "NA",
+      lvPowerFreq: 3, lvInduced: "Twice to Rated Voltage", lvImpulse: "NA"
+    },
+    3.6: {
+      hvPowerFreq: 10, hvInduced: "Twice to Rated Voltage", hvImpulse: 20,
+      lvPowerFreq: 10, lvInduced: "Twice to Rated Voltage", lvImpulse: 20
+    },
+    6.6: {
+      hvPowerFreq: 20, hvInduced: "Twice to Rated Voltage", hvImpulse: 60,
+      lvPowerFreq: 20, lvInduced: "Twice to Rated Voltage", lvImpulse: 60
+    },
+    11: {
+      hvPowerFreq: 28, hvInduced: "Twice to Rated Voltage", hvImpulse: 75,
+      lvPowerFreq: 28, lvInduced: "Twice to Rated Voltage", lvImpulse: 75
+    },
+    15: {
+      hvPowerFreq: 38, hvInduced: "Twice to Rated Voltage", hvImpulse: 95,
+      lvPowerFreq: 38, lvInduced: "Twice to Rated Voltage", lvImpulse: 95
+    },
+    22: {
+      hvPowerFreq: 50, hvInduced: "Twice to Rated Voltage", hvImpulse: 125,
+      lvPowerFreq: 50, lvInduced: "Twice to Rated Voltage", lvImpulse: 125
+    },
+    33: {
+      hvPowerFreq: 70, hvInduced: "Twice to Rated Voltage", hvImpulse: 170,
+      lvPowerFreq: 70, lvInduced: "Twice to Rated Voltage", lvImpulse: 170
+    },
+    66: {
+      hvPowerFreq: 140, hvInduced: "Twice to Rated Voltage", hvImpulse: 325,
+      lvPowerFreq: 140, lvInduced: "Twice to Rated Voltage", lvImpulse: 325
+    },
+    110: {
+      hvPowerFreq: 185, hvInduced: "Twice to Rated Voltage", hvImpulse: 450,
+      lvPowerFreq: 185, lvInduced: "Twice to Rated Voltage", lvImpulse: 450
+    },
+    132: {
+      hvPowerFreq: 230, hvInduced: "Twice to Rated Voltage", hvImpulse: 550,
+      lvPowerFreq: 230, lvInduced: "Twice to Rated Voltage", lvImpulse: 550
+    },
+    220: {
+      hvPowerFreq: 395, hvInduced: "Twice to Rated Voltage", hvImpulse: 950,
+      lvPowerFreq: 395, lvInduced: "Twice to Rated Voltage", lvImpulse: 950
+    },
+    400: {
+      hvPowerFreq: 570, hvInduced: "Twice to Rated Voltage", hvImpulse: 1300,
+      lvPowerFreq: 570, lvInduced: "Twice to Rated Voltage", lvImpulse: 1300
+    },
+    420.1: {
+      hvPowerFreq: 630, hvInduced: "Twice to Rated Voltage", hvImpulse: 1425,
+      lvPowerFreq: 630, lvInduced: "Twice to Rated Voltage", lvImpulse: 1425
+    }
+  };
+
+  // MultiSelectComboBox for multi-select and custom values
+  function MultiSelectComboBox({ options, value, onChange, placeholder }) {
+    const [open, setOpen] = React.useState(false);
+    const [inputValue, setInputValue] = React.useState('');
+    const containerRef = React.useRef(null);
+
+    React.useEffect(() => {
+      function handleClickOutside(event) {
+        if (containerRef.current && !containerRef.current.contains(event.target)) {
+          setOpen(false);
+        }
+      }
+      if (open) {
+        document.addEventListener('mousedown', handleClickOutside);
+      } else {
+        document.removeEventListener('mousedown', handleClickOutside);
+      }
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, [open]);
+
+    const handleSelect = (option) => {
+      if (!value.includes(option)) {
+        onChange([...value, option]);
+      }
+      setInputValue('');
+      setOpen(false);
+    };
+    const handleRemove = (option) => {
+      onChange(value.filter(v => v !== option));
+    };
+    const handleInputChange = (e) => {
+      setInputValue(e.target.value);
+      setOpen(true);
+    };
+    const handleInputKeyDown = (e) => {
+      if ((e.key === 'Enter' || e.key === ',') && inputValue.trim()) {
+        e.preventDefault();
+        if (!value.includes(inputValue.trim())) {
+          onChange([...value, inputValue.trim()]);
+        }
+        setInputValue('');
+        setOpen(false);
+      } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
+        onChange(value.slice(0, -1));
+      }
+    };
+    const handleBlur = () => {
+      if (inputValue.trim() && !value.includes(inputValue.trim())) {
+        onChange([...value, inputValue.trim()]);
+        setInputValue('');
+      }
+      setOpen(false);
+    };
+    return (
+      <div className="relative" ref={containerRef}>
+        <div className="flex flex-wrap gap-1 items-center border rounded p-1 bg-white focus-within:ring-2 focus-within:ring-blue-500">
+          {value.map((v, idx) => (
+            <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded flex items-center text-xs">
+              {v}
+              <button type="button" className="ml-1 text-blue-500 hover:text-red-500" onClick={() => handleRemove(v)}>&times;</button>
+            </span>
+          ))}
+          <input
+            type="text"
+            className="flex-1 min-w-[80px] p-1 outline-none"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            onBlur={handleBlur}
+            placeholder={placeholder}
+            onFocus={() => setOpen(true)}
+            autoComplete="off"
+          />
+        </div>
+        {open && (options.length > 0) && (
+          <div className="absolute z-10 bg-white border rounded shadow w-full max-h-48 overflow-y-auto mt-1">
+            {options.filter(opt => opt.toLowerCase().includes(inputValue.toLowerCase()) && !value.includes(opt)).map((option) => (
+              <div
+                key={option}
+                className="px-2 py-1 hover:bg-blue-50 cursor-pointer"
+                onMouseDown={() => handleSelect(option)}
+              >
+                {option}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const allStandardFittings = [
+    'Rating & Diagram Plate:',
+    'Earthing Terminals:',
+    'Lifting Lugs for Transformer:',
+    'Lifting Lugs for Top Cover:',
+    'Bottom Drain cum Filter Valve with Plug:',
+    'Top Filter Valve with Plug:',
+    'Conservator Tank:',
+    'Plain Prismatic Oil Level Gauge:',
+    'Magnetic Oil Level Gauge with Low Level Alarm contacts:',
+    'Oil Filling hole with Plug:',
+    'Air Release Plug:',
+    'Thermometer Pocket:',
+    'Silica gel Breather:',
+    'Pressure Relief Valve:',
+    'Detachable Radiators with Shutoff Valves:',
+    'Bi-directional Rollers & skid under base:',
+    'Oil Temperature Indicator (6” Dial Type) with Alarm & Trip Contacts:',
+    'Winding Temperature Indicator (6” Dial Type) with Alarm & Trip contacts:',
+    'Double Float Buchholz Relay with Alarm & Trip Contacts:',
+    'Marshalling Box with complete wiring:',
+    'Inspection Cover:',
+    'Jacking pads:',
+    'Electrostatic shield with bushing:'
+  ];
+
+  // Logic function to determine if BIL options should be shown
+
+function getCeilingBILChoices(voltage) {
+  const voltageNum = parseFloat(voltage);
+  // Return null if the voltage is not a number or is below the lowest tier.
+  if (isNaN(voltageNum) || voltageNum < 110) return null;
+
+  const keys = Object.keys(bilOptionsTable).map(Number).sort((a, b) => a - b);
+
+  // Find the first key that is greater than or equal to the input voltage.
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i] >= voltageNum) {
+      return bilOptionsTable[keys[i]];
+    }
+  }
+
+  // If no key is found (e.g., input is higher than all tiers), return the highest available tier.
+  return bilOptionsTable[keys[keys.length - 1]];
+}
+
+  // Add this helper function inside App (before calculateEfficiencies):
+function calculateCurrents({ transformerMVA, primaryVoltage, secondaryWindingConfig, secondaryVoltage, secondary1Voltage, secondary2Voltage, secondary3Voltage, secondary4Voltage, secondaryKVA, secondary1KVA, secondary2KVA, secondary3KVA, secondary4KVA }) {
+  const mva = parseFloat(transformerMVA);
+  const hvVoltage = parseFloat(primaryVoltage);
+  let hvCurrent = '';
+  let lvCurrents = [];
+
+  // HV current (Amps) = MVA * 1000 / (sqrt(3) * HV kV)
+  if (mva && hvVoltage) {
+    hvCurrent = (mva * 1000) / (Math.sqrt(3) * hvVoltage);
+    hvCurrent = hvCurrent.toFixed(2);
+  }
+
+  // LV current (Amps) = kVA * 1000 / (sqrt(3) * LV Volts)
+  // Since voltage is in kV, the formula is: kVA / (sqrt(3) * LV kV)
+  if (secondaryWindingConfig === 'single') {
+    const kva = parseFloat(secondaryKVA);
+    const lvV = parseFloat(secondaryVoltage);
+    if (kva && lvV) {
+      const lvCurrent = kva / (Math.sqrt(3) * lvV);
+      lvCurrents[0] = lvCurrent.toFixed(2);
+    }
+  } else if (secondaryWindingConfig === 'two') {
+    const kva1 = parseFloat(secondary1KVA);
+    const kva2 = parseFloat(secondary2KVA);
+    const lv1V = parseFloat(secondary1Voltage);
+    const lv2V = parseFloat(secondary2Voltage);
+    if (kva1 && lv1V) {
+      const lv1Current = kva1 / (Math.sqrt(3) * lv1V);
+      lvCurrents[0] = lv1Current.toFixed(2);
+    }
+    if (kva2 && lv2V) {
+      const lv2Current = kva2 / (Math.sqrt(3) * lv2V);
+      lvCurrents[1] = lv2Current.toFixed(2);
+    }
+  } else if (secondaryWindingConfig === 'four') {
+    const kvaArr = [
+      parseFloat(secondary1KVA),
+      parseFloat(secondary2KVA),
+      parseFloat(secondary3KVA),
+      parseFloat(secondary4KVA)
+    ];
+    const lvVArr = [
+      parseFloat(secondary1Voltage),
+      parseFloat(secondary2Voltage),
+      parseFloat(secondary3Voltage),
+      parseFloat(secondary4Voltage)
+    ];
+    for (let i = 0; i < 4; i++) {
+      if (kvaArr[i] && lvVArr[i]) {
+        const lvCurrent = kvaArr[i] / (Math.sqrt(3) * lvVArr[i]);
+        lvCurrents[i] = lvCurrent.toFixed(2);
+      }
+    }
+  }
+  return { hvCurrent, lvCurrents };
+}
+
+  // Main App component
+  function App() {
+    const [formData, setFormData] = React.useState({
+      manufacturer: 'Mahati Industries Pvt. Ltd.',
+      customer: '',
+      numberOfTransformers: '',
+      transformerMVA: '',
+      primaryVoltage: '',
+      noOfPhasesPrimary: [],
+      frequency: '',
+      connectionPrimary: [],
+      secondaryVoltage: '', // For single secondary
+      secondaryKVA: '', // For single secondary
+      secondaryPhases: [], // For single secondary
+      secondaryConnection: [], // For single secondary
+      secondaryPhaseDifference: '', // For single secondary
+      secondary1Voltage: '', // For two/four secondaries
+      secondary2Voltage: '', // For two/four secondaries
+      secondary3Voltage: '', // For four secondaries
+      secondary4Voltage: '', // For four secondaries
+      secondary1KVA: '', // For two/four secondaries
+      secondary2KVA: '', // For two/four secondaries
+      secondary3KVA: '', // For four secondaries
+      secondary4KVA: '', // For four secondaries
+      secondary1Phases: [], // For two/four secondaries
+      secondary2Phases: [], // For two/four secondaries
+      secondary3Phases: [], // For four secondaries
+      secondary4Phases: [], // For four secondaries
+      secondary1Connection: [], // For two/four secondaries
+      secondary2Connection: [], // For two/four secondaries
+      secondary3Connection: [], // For four secondaries
+      secondary4Connection: [], // For four secondaries
+      secondary1PhaseDifference: '', // For two/four secondaries
+      secondary2PhaseDifference: '', // For two/four secondaries
+      secondary3PhaseDifference: '', // For four secondaries
+      secondary4PhaseDifference: '', // For four secondaries
+      impedanceVoltage: '',
+      tappingRange: [],
+      tapChangerType: [],
+      tapChangerControl: '',
+      tapsStepsHV: '',
+      vectorGroup: [],
+      ambientTempRise: '',
+      oilTempRise: '',
+      windingTempRise: '',
+      coolingType: [],
+      installation: [],
+      noLoadLoss: '',
+      loadLoss: '',
+      insulationClass: [],
+      terminalHV: [],
+      lossStandard1: 'IS 2026',
+      lossStandard2: 'IS 2026',
+      // MODIFICATION: Changed from a single terminalLV to multiple
+      terminalLV1: [],
+      terminalLV2: [],
+      terminalLV3: [],
+      terminalLV4: [],
+      transformerOil: '',
+      paintEnamel: [],
+      referenceStandards: [],
+      length: '',
+      width: '',
+      height: '',
+      coreWindingsWeight: '',
+      tankFittingsWeight: '',
+      oilMass: '',
+      totalWeight: ''
+    });
+    const [registerOutput, setRegisterOutput] = React.useState('');
+    const [report, setReport] = React.useState(null);
+    const [error, setError] = React.useState('');
+    const [errors, setErrors] = React.useState({});
+    const [editFittings, setEditFittings] = React.useState(false);
+    const [selectedFittings, setSelectedFittings] = React.useState(allStandardFittings);
+    const [fittingQuantities, setFittingQuantities] = React.useState(() => {
+      const obj = {};
+      allStandardFittings.forEach(f => { obj[f] = 1; });
+      return obj;
+    });
+    const [showAdditionalFittings, setShowAdditionalFittings] = React.useState(false);
+    const [additionalFittings, setAdditionalFittings] = React.useState([]);
+    const [newFitting, setNewFitting] = React.useState('');
+    const [newFittingQty, setNewFittingQty] = React.useState(1);
+    const [showAdditionalDetails, setShowAdditionalDetails] = React.useState(false);
+    const [secondaryWindingConfig, setSecondaryWindingConfig] = React.useState('single'); // 'single', 'two', 'four'
+
+    // Automatically distribute MVA to secondary KVA
+    React.useEffect(() => {
+      const mva = parseFloat(formData.transformerMVA);
+      if (!mva || mva <= 0) return;
+
+      const totalKVA = mva * 1000;
+
+      if (secondaryWindingConfig === 'single') {
+        setFormData(prev => ({ ...prev, secondaryKVA: totalKVA.toString() }));
+      } else if (secondaryWindingConfig === 'two') {
+        const kvaPerWinding = totalKVA / 2;
+        setFormData(prev => ({
+          ...prev,
+          secondary1KVA: kvaPerWinding.toString(),
+          secondary2KVA: kvaPerWinding.toString()
+        }));
+      } else if (secondaryWindingConfig === 'four') {
+        const kvaPerWinding = totalKVA / 4;
+        setFormData(prev => ({
+          ...prev,
+          secondary1KVA: kvaPerWinding.toString(),
+          secondary2KVA: kvaPerWinding.toString(),
+          secondary3KVA: kvaPerWinding.toString(),
+          secondary4KVA: kvaPerWinding.toString()
+        }));
+      }
+    }, [formData.transformerMVA, secondaryWindingConfig]);
+
+    // Automatically calculate Taps/Steps on H.V. Winding
+    React.useEffect(() => {
+      if (formData.tappingRange && formData.tappingRange.length > 0) {
+        const tappingString = formData.tappingRange[0];
+        // Regex to extract the upper, lower, and step values
+        const match = tappingString.match(/([+-]?\d+(?:\.\d+)?)\s*%\s*to\s*([+-]?\d+(?:\.\d+)?)\s*%\s*in\s*step\s*of\s*(\d+(?:\.\d+)?)\s*%/i);
+
+        if (match) {
+          const upper = parseFloat(match[1]);
+          const lower = parseFloat(match[2]);
+          const step = parseFloat(match[3]);
+
+          if (!isNaN(upper) && !isNaN(lower) && !isNaN(step) && step > 0) {
+            const numberOfSteps = Math.abs(upper - lower) / step;
+            const numberOfPositions = numberOfSteps + 1;
+            setFormData(prev => ({ ...prev, tapsStepsHV: `${numberOfSteps} / ${numberOfPositions}` }));
+          }
+        }
+      } else {
+        // Clear the field if tapping range is removed
+        setFormData(prev => ({ ...prev, tapsStepsHV: '' }));
+      }
+    }, [formData.tappingRange]);
+
+const [terminalFittings, setTerminalFittings] = React.useState([]);
+const [terminalFittingQuantities, setTerminalFittingQuantities] = React.useState({});
+    // State to hold the user's selected BIL choice for HV
+    const [selectedHvBil, setSelectedHvBil] = React.useState(null);
+    const [selectedLv1Bil, setSelectedLv1Bil] = React.useState(null);
+    const [selectedLv2Bil, setSelectedLv2Bil] = React.useState(null);
+    const [selectedLv3Bil, setSelectedLv3Bil] = React.useState(null);
+    const [selectedLv4Bil, setSelectedLv4Bil] = React.useState(null);
+    
+    // --- BIL Choices Calculation (moved here to be accessible by calculateEfficiencies) ---
+    const hvVoltageNum = parseFloat(formData.primaryVoltage);
+    const hvBilChoices = getCeilingBILChoices(hvVoltageNum);
+    // For single secondary config
+    const lv1VoltageNum_single = parseFloat(formData.secondaryVoltage); 
+    const lv1BilChoices_single = getCeilingBILChoices(lv1VoltageNum_single);
+    
+    // For two/four secondary configs
+    const lv1VoltageNum_multi = parseFloat(formData.secondary1Voltage);
+    const lv1BilChoices_multi = getCeilingBILChoices(lv1VoltageNum_multi);
+    const lv2VoltageNum_multi = parseFloat(formData.secondary2Voltage);
+    const lv2BilChoices_multi = getCeilingBILChoices(lv2VoltageNum_multi);
+    const lv3VoltageNum_multi = parseFloat(formData.secondary3Voltage);
+    const lv3BilChoices_multi = getCeilingBILChoices(lv3VoltageNum_multi);
+    const lv4VoltageNum_multi = parseFloat(formData.secondary4Voltage);
+    const lv4BilChoices_multi = getCeilingBILChoices(lv4VoltageNum_multi);
+    // ------------------------------------------------------------------------------------
+
+
+    // Function to find closest clearance level
+    const getClearanceLevel = (voltage, clearanceTable, bil = null) => {
+      const voltageNum = parseFloat(voltage);
+      if (isNaN(voltageNum)) return null;
+      const levels = Object.keys(clearanceTable).map(Number).sort((a, b) => a - b);
+      let closestLevel = levels[0];
+      for (let level of levels) {
+        if (voltageNum >= level) {
+          closestLevel = level;
+        } else {
+          break;
+        }
+      }
+      const clearance = clearanceTable[closestLevel];
+      if (typeof clearance === 'object' && clearance.default && bil) {
+        const bilNum = parseFloat(bil);
+        if (isNaN(bilNum)) return clearance.default;
+        const bilKeys = Object.keys(clearance).filter(k => k !== 'default').map(Number).sort((a, b) => a - b);
+        let closestBIL = 'default';
+        for (let bilLevel of bilKeys) {
+          if (bilNum >= bilLevel) {
+            closestBIL = bilLevel;
+          } else {
+            break;
+          }
+        }
+        return clearance[closestBIL] || clearance.default;
+      }
+      return clearance;
+    };
+
+    // Function to get clearances based on terminal type and voltage
+    const getClearances = (voltage, terminalType, bil = null) => {
+      if (!terminalType || terminalType.length === 0) {
+        return getClearanceLevel(voltage, minimumClearances, bil);
+      }
+      if (terminalType.includes('Cable Box')) {
+        return getClearanceLevel(voltage, cableBoxClearances);
+      } else {
+        return getClearanceLevel(voltage, minimumClearances, bil);
+      }
+    };
+
+    // Function to find closest insulation level
+    const getInsulationLevel = (voltage) => {
+        const voltageNum = parseFloat(voltage);
+        if (isNaN(voltageNum)) return null;
+
+        const levels = Object.keys(insulationLevels).map(Number).sort((a, b) => a - b);
+
+        // Find the first level that is greater than or equal to the input voltage (ceiling logic)
+        for (const level of levels) {
+            if (level >= voltageNum) {
+                return insulationLevels[level];
+            }
+        }
+
+        // If the input voltage is higher than all available tiers, return the highest one.
+        if (levels.length > 0) {
+            return insulationLevels[levels[levels.length - 1]];
+        }
+        return null; // Should not happen if insulationLevels is not empty
+    };
+
+    // Handling form input changes, now includes resetting BIL selection
+    const handleInputChange = (e) => {
+      const { name, value } = e.target;
+      
+      if (name === 'primaryVoltage') {
+          setSelectedHvBil(null); // Reset HV BIL choice if primary voltage changes
+      }
+      if (name === 'secondaryVoltage') setSelectedLv1Bil(null);
+      if (name === 'secondary1Voltage') setSelectedLv1Bil(null);
+      if (name === 'secondary2Voltage') setSelectedLv2Bil(null);
+      if (name === 'secondary3Voltage') setSelectedLv3Bil(null);
+      if (name === 'secondary4Voltage') setSelectedLv4Bil(null);
+
+      setFormData((prev) => ({ ...prev, [name]: value }));
+
+      // Clear error for this field if now valid
+      setErrors(prevErrors => {
+        const newErrors = { ...prevErrors };
+        // Validation checks to remove errors on valid input
+        if (name === 'transformerMVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.transformerMVA;
+        if (name === 'primaryVoltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.primaryVoltage;
+        if (name === 'secondaryVoltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondaryVoltage;
+        if (name === 'secondaryKVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondaryKVA;
+        if (name === 'secondary1Voltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary1Voltage;
+        if (name === 'secondary2Voltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary2Voltage;
+        if (name === 'secondary1KVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary1KVA;
+        if (name === 'secondary2KVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary2KVA;
+        if (name === 'secondary3Voltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary3Voltage;
+        if (name === 'secondary4Voltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary4Voltage;
+        if (name === 'secondary3KVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary3KVA;
+        if (name === 'secondary4KVA' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.secondary4KVA;
+        if (name === 'noLoadLoss' && value && !isNaN(parseFloat(value)) && parseFloat(value) >= 0) delete newErrors.noLoadLoss;
+        if (name === 'loadLoss' && value && !isNaN(parseFloat(value)) && parseFloat(value) >= 0) delete newErrors.loadLoss;
+        if (name === 'impedanceVoltage' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.impedanceVoltage;
+        if (name === 'oilTempRise' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.oilTempRise;
+        if (name === 'windingTempRise' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.windingTempRise;
+        if (name === 'numberOfTransformers' && value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) delete newErrors.numberOfTransformers;
+        return newErrors;
+      });
+    };
+
+    let indexInput = 1;
+    let indexOutput = 1;
+
+    // Validating and calculating parameters for the report
+    const calculateEfficiencies = () => {
+      const newErrors = {};
+      if (!formData.numberOfTransformers || isNaN(parseFloat(formData.numberOfTransformers)) || parseFloat(formData.numberOfTransformers) <= 0) {
+      newErrors.numberOfTransformers = 'Please enter a valid number of transformers (> 0).';
+    }
+    if (!formData.transformerMVA || isNaN(parseFloat(formData.transformerMVA)) || parseFloat(formData.transformerMVA) <= 0) {
+      newErrors.transformerMVA = 'Please enter a valid transformer MVA (> 0).';
+    }
+    if (!formData.primaryVoltage || isNaN(parseFloat(formData.primaryVoltage)) || parseFloat(formData.primaryVoltage) <= 0) {
+      newErrors.primaryVoltage = 'Please enter a valid primary voltage (> 0).';
+    }
+    if (secondaryWindingConfig === 'single' && (!formData.secondaryVoltage || isNaN(parseFloat(formData.secondaryVoltage)) || parseFloat(formData.secondaryVoltage) <= 0)) newErrors.secondaryVoltage = 'Please enter a valid secondary voltage (> 0).';
+    if (secondaryWindingConfig === 'single' && (!formData.secondaryKVA || isNaN(parseFloat(formData.secondaryKVA)) || parseFloat(formData.secondaryKVA) <= 0)) newErrors.secondaryKVA = 'Please enter a valid secondary KVA (> 0).';
+
+    if (secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') {
+      if (!formData.secondary1Voltage || isNaN(parseFloat(formData.secondary1Voltage)) || parseFloat(formData.secondary1Voltage) <= 0) newErrors.secondary1Voltage = 'Please enter a valid secondary 1 voltage (> 0).';
+      if (!formData.secondary2Voltage || isNaN(parseFloat(formData.secondary2Voltage)) || parseFloat(formData.secondary2Voltage) <= 0) newErrors.secondary2Voltage = 'Please enter a valid secondary 2 voltage (> 0).';
+      if (!formData.secondary1KVA || isNaN(parseFloat(formData.secondary1KVA)) || parseFloat(formData.secondary1KVA) <= 0) newErrors.secondary1KVA = 'Please enter a valid secondary 1 KVA (> 0).';
+      if (!formData.secondary2KVA || isNaN(parseFloat(formData.secondary2KVA)) || parseFloat(formData.secondary2KVA) <= 0) newErrors.secondary2KVA = 'Please enter a valid secondary 2 KVA (> 0).';
+    }
+
+    if (secondaryWindingConfig === 'four') {
+      if (!formData.secondary3Voltage || isNaN(parseFloat(formData.secondary3Voltage)) || parseFloat(formData.secondary3Voltage) <= 0) newErrors.secondary3Voltage = 'Please enter a valid secondary 3 voltage (> 0).';
+      if (!formData.secondary4Voltage || isNaN(parseFloat(formData.secondary4Voltage)) || parseFloat(formData.secondary4Voltage) <= 0) newErrors.secondary4Voltage = 'Please enter a valid secondary 4 voltage (> 0).';
+      if (!formData.secondary3KVA || isNaN(parseFloat(formData.secondary3KVA)) || parseFloat(formData.secondary3KVA) <= 0) newErrors.secondary3KVA = 'Please enter a valid secondary 3 KVA (> 0).';
+      if (!formData.secondary4KVA || isNaN(parseFloat(formData.secondary4KVA)) || parseFloat(formData.secondary4KVA) <= 0) newErrors.secondary4KVA = 'Please enter a valid secondary 4 KVA (> 0).';
+    }
+
+    if (!formData.noLoadLoss || isNaN(parseFloat(formData.noLoadLoss)) || parseFloat(formData.noLoadLoss) < 0) {
+      newErrors.noLoadLoss = 'Please enter a valid no load loss (≥ 0).';
+    }
+    if (!formData.loadLoss || isNaN(parseFloat(formData.loadLoss)) || parseFloat(formData.loadLoss) < 0) {
+      newErrors.loadLoss = 'Please enter a valid load loss (≥ 0).';
+    }
+    if (!formData.impedanceVoltage || isNaN(parseFloat(formData.impedanceVoltage)) || parseFloat(formData.impedanceVoltage) <= 0) {
+      newErrors.impedanceVoltage = 'Please enter a valid impedance voltage (> 0).';
+    }
+    if (!formData.oilTempRise || isNaN(parseFloat(formData.oilTempRise)) || parseFloat(formData.oilTempRise) <= 0) {
+      newErrors.oilTempRise = 'Please enter a valid oil temperature rise (> 0).';
+    }
+    if (!formData.windingTempRise || isNaN(parseFloat(formData.windingTempRise)) || parseFloat(formData.windingTempRise) <= 0) {
+      newErrors.windingTempRise = 'Please enter a valid winding temperature rise (> 0).';
+    }
+
+     if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setError('Please fill in all required fields correctly.');
+      return;
+    }
+    setErrors({});
+    setError('');
+
+    // --- Calculate currents ---
+    
+   // --- Calculate currents ---
+const { hvCurrent, lvCurrents } = calculateCurrents({
+  transformerMVA: formData.transformerMVA,
+  primaryVoltage: formData.primaryVoltage,
+  secondaryWindingConfig,
+  secondaryVoltage: formData.secondaryVoltage,
+  secondary1Voltage: formData.secondary1Voltage,
+  secondary2Voltage: formData.secondary2Voltage,
+  secondary3Voltage: formData.secondary3Voltage,
+  secondary4Voltage: formData.secondary4Voltage,
+  secondaryKVA: formData.secondaryKVA,
+  secondary1KVA: formData.secondary1KVA,
+  secondary2KVA: formData.secondary2KVA,
+  secondary3KVA: formData.secondary3KVA,
+  secondary4KVA: formData.secondary4KVA,
+});
+
+
+    // --- Efficiency calculation logic starts here ---
+    const { transformerMVA, noLoadLoss, loadLoss } = formData;
+    const mva = parseFloat(transformerMVA);
+    const nll = parseFloat(noLoadLoss);
+    const ll = parseFloat(loadLoss);
+    const loads = [0.25, 0.5, 0.75, 1, 1.1];
+    const efficiencies = { upf: {}, pf08: {} };
+    const kva = mva * 1000;
+    loads.forEach((load) => {
+      const p_out_upf = kva * load * 1.0;
+      const losses = nll + ll * load * load;
+      efficiencies.upf[load] = ((p_out_upf / (p_out_upf + losses)) * 100).toFixed(4);
+
+      const p_out_pf08 = kva * load * 0.8;
+      efficiencies.pf08[load] = ((p_out_pf08 / (p_out_pf08 + losses)) * 100).toFixed(4);
+    });
+
+    // --- HV BIL calculation logic starts here ---
+    const hvInsulationLevel = getInsulationLevel(formData.primaryVoltage);
+    const hvInducedValue = hvInsulationLevel?.hvInduced === "Twice to Rated Voltage" 
+        ? (parseFloat(formData.primaryVoltage) * 2).toFixed(2) 
+        : hvInsulationLevel?.hvInduced;
+    const finalHvSeparateSourceVoltage = (hvBilChoices && selectedHvBil) ? selectedHvBil.freq : hvInsulationLevel?.hvPowerFreq;
+    const finalHvInducedVoltage = hvInducedValue;
+    const finalHvImpulseVoltage = (hvBilChoices && selectedHvBil) ? selectedHvBil.impulse : hvInsulationLevel?.hvImpulse;
+    
+    // --- LV BIL calculation logic starts here ---
+    const lvValues = [];
+    if (secondaryWindingConfig === 'single') {
+        lvValues.push({ voltage: formData.secondaryVoltage, choices: lv1BilChoices_single, selected: selectedLv1Bil });
+    }
+    if (secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') {
+        // FIXED: Using the newly calculated multi-secondary BIL choice variables.
+        lvValues.push({ voltage: formData.secondary1Voltage, choices: lv1BilChoices_multi, selected: selectedLv1Bil });
+        lvValues.push({ voltage: formData.secondary2Voltage, choices: lv2BilChoices_multi, selected: selectedLv2Bil });
+    }
+    if (secondaryWindingConfig === 'four') {
+        lvValues.push({ voltage: formData.secondary3Voltage, choices: lv3BilChoices_multi, selected: selectedLv3Bil });
+        lvValues.push({ voltage: formData.secondary4Voltage, choices: lv4BilChoices_multi, selected: selectedLv4Bil });
+    }
+
+    const finalLvBilValues = lvValues.filter(v => v.voltage).map(v => {
+        const defaultLevel = getInsulationLevel(v.voltage);
+        const powerFreq = (v.choices && v.selected) ? v.selected.freq : defaultLevel?.lvPowerFreq;
+        const induced = defaultLevel?.lvInduced === "Twice to Rated Voltage" ? (parseFloat(v.voltage) * 2).toFixed(2) : defaultLevel?.lvInduced;
+        const impulse = (v.choices && v.selected) ? v.selected.impulse : defaultLevel?.lvImpulse;
+        return { powerFreq, induced, impulse };
+    });
+
+    const finalLvSeparateSourceVoltage = finalLvBilValues.length > 0 ? Math.min(...finalLvBilValues.map(v => v.powerFreq || Infinity)) : '';
+    const finalLvInducedVoltage = finalLvBilValues.length > 0 ? Math.min(...finalLvBilValues.map(v => parseFloat(v.induced) || Infinity)).toFixed(2) : '';
+    const finalLvImpulseVoltage = finalLvBilValues.length > 0 ? (finalLvBilValues.every(v => v.impulse === "NA") ? "NA" : Math.min(...finalLvBilValues.map(v => v.impulse || Infinity))) : '';
+
+    // MODIFICATION: Use individual impulse values for clearance calculations
+    const hvClearance = getClearances(formData.primaryVoltage, formData.terminalHV, finalHvImpulseVoltage);
+    const lvClearances = {};
+    if (secondaryWindingConfig === 'single') {
+        lvClearances['Secondary'] = getClearances(formData.secondaryVoltage, formData.terminalLV1, finalLvBilValues[0]?.impulse);
+    }
+    if (secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') {
+        lvClearances['Secondary-1'] = getClearances(formData.secondary1Voltage, formData.terminalLV1, finalLvBilValues[0]?.impulse);
+        lvClearances['Secondary-2'] = getClearances(formData.secondary2Voltage, formData.terminalLV2, finalLvBilValues[1]?.impulse);
+    }
+    if (secondaryWindingConfig === 'four') {
+        lvClearances['Secondary-3'] = getClearances(formData.secondary3Voltage, formData.terminalLV3, finalLvBilValues[2]?.impulse);
+        lvClearances['Secondary-4'] = getClearances(formData.secondary4Voltage, formData.terminalLV4, finalLvBilValues[3]?.impulse);
+    }
+
+    // --- Set the final report state ---
+    setReport({
+      ...formData,
+      efficiencies,
+      secondaryWindingConfig,
+      selectedFittings,
+      terminalFittings,        
+      fittingQuantities,
+      additionalFittings,
+       allFittings: combinedFittings,
+       terminalFittingQuantities,
+      hvClearance,
+      lvClearances,
+      hvSeparateSourceVoltage: finalHvSeparateSourceVoltage,
+      hvInducedVoltage: finalHvInducedVoltage,
+      hvImpulseVoltage: finalHvImpulseVoltage,
+      lvSeparateSourceVoltage: finalLvSeparateSourceVoltage,
+      lvInducedVoltage: finalLvInducedVoltage,
+      lvImpulseVoltage: finalLvImpulseVoltage,
+      finalLvBilValues: finalLvBilValues,
+      totalLoss: (nll || 0) + (ll || 0),
+      hvCurrent,
+      lvCurrents
+    });
+  };
+
+    // Print functionality
+    const handleDownloadPDF = () => {
+      window.print();
+    };
+
+// Sync terminal selections to fittings list
+React.useEffect(() => {
+  const prefixLookup = {
+    terminalHV:  'HV Terminal – ',
+    terminalLV1: secondaryWindingConfig === 'single' ? 'LV Terminal – ' : 'LV-1 Terminal – ',
+    terminalLV2: 'LV-2 Terminal – ',
+    terminalLV3: 'LV-3 Terminal – ',
+    terminalLV4: 'LV-4 Terminal – '
+  };
+
+  const buildLabels = (name, values = []) =>
+    values.map(option => `${prefixLookup[name] || ''}${option}`);
+
+  const updated = [
+    ...buildLabels('terminalHV', formData.terminalHV),
+    ...buildLabels('terminalLV1', formData.terminalLV1),
+    ...buildLabels('terminalLV2', formData.terminalLV2),
+    ...buildLabels('terminalLV3', formData.terminalLV3),
+    ...buildLabels('terminalLV4', formData.terminalLV4)
+  ].filter(Boolean);
+
+  setTerminalFittings(updated);
+  
+  // Initialize quantities for new terminal fittings
+  setTerminalFittingQuantities(prev => {
+    const newQtys = { ...prev };
+    updated.forEach(fitting => {
+      if (!newQtys[fitting]) {
+        newQtys[fitting] = 1;
+      }
+    });
+    // Remove quantities for fittings that are no longer selected
+    Object.keys(newQtys).forEach(key => {
+      if (!updated.includes(key)) {
+        delete newQtys[key];
+      }
+    });
+    return newQtys;
+  });
+}, [
+  formData.terminalHV,
+  formData.terminalLV1,
+  formData.terminalLV2,
+  formData.terminalLV3,
+  formData.terminalLV4,
+  secondaryWindingConfig
+]);
+
+// Combine all fittings sources
+const combinedFittings = React.useMemo(() => {
+  const manual = new Set(selectedFittings);
+  terminalFittings.forEach(item => manual.add(item));
+  additionalFittings.forEach(({ desc }) => manual.add(desc));
+  return Array.from(manual);
+}, [selectedFittings, terminalFittings, additionalFittings]);
+
+    // Update total weight
+    React.useEffect(() => {
+      const extractNumber = (text) => {
+        if (!text) return 0;
+        const match = text.toString().match(/\d+(?:\.\d+)?/);
+        return match ? parseFloat(match[0]) : 0;
+      };
+      
+      const core = extractNumber(formData.coreWindingsWeight);
+      const tank = extractNumber(formData.tankFittingsWeight);
+      const oil = extractNumber(formData.oilMass);
+      const total = core + tank + oil;
+      
+      if (total > 0) {
+        setFormData(prev => ({ ...prev, totalWeight: total.toFixed(2) }));
+      } else {
+        setFormData(prev => ({ ...prev, totalWeight: '' }));
+      }
+    }, [formData.coreWindingsWeight, formData.tankFittingsWeight, formData.oilMass]);
+    
+    // Rendering the form and report
+    return (
+      <div className="container mx-auto p-4 max-w-6xl">
+        <div className="logo-header flex flex-wrap items-center justify-center mb-8 space-x-4 no-print">
+          <img
+            src="https://images.squarespace-cdn.com/content/v1/67c6cd6aa7237560f57b1238/5dc6f094-8e85-4639-9c96-e5aa5e773ec0/BCS-Mahati-with-C_TM-revised-02.png?format=1500w"
+            alt="Company Logo"
+            className="h-20 max-w-full object-contain"
+          />
+          <h1 className="text-4xl font-bold text-blue-800">
+            Converter Transformer
+          </h1>
+        </div>
+
+        {/* Input Form */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+          <h2 className="text-xl font-bold mb-4 text-center">ANNEXURE – {formData.annexureNumber || 'I'}</h2>
+          <h3 className="text-lg font-semibold mb-4 text-center">
+            TECHNICAL PARTICULARS FOR CONVERTER DUTY TRANSFORMER 
+          </h3>
+          <div className="flex justify-end mb-2 gap-4">
+            <label className="flex items-center gap-2">
+              <span className="font-semibold">Annexure No.:</span>
+              <input
+                type="text"
+                name="annexureNumber"
+                value={formData.annexureNumber}
+                onChange={handleInputChange}
+                className="w-20 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="I"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="font-semibold">Revision No.:</span>
+              <input
+                type="number"
+                min="1"
+                value={registerOutput}
+                onChange={e => setRegisterOutput(e.target.value.replace(/[^0-9]/g, ''))}
+                className="w-20 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="n"
+              />
+            </label>
+          </div>
+          {error && (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+          )}
+          {Object.values(errors).length > 0 && (
+            <div className="mt-2 mb-4 p-2 font-bold bg-red-100 text-red-800 border border-red-300 rounded text-center text-sm">
+              Some fields are missing input.
+            </div>
+          )}
+          
+          <table className="w-full border-collapse border border-gray-300 text-sm">
+            <thead>
+              <tr className="bg-blue-100">
+                <th className="border border-gray-300 p-2">Sr. No.</th>
+                <th className="border border-gray-300 p-2">Description</th>
+                <th className="border border-gray-300 p-2">Particulars</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Name of the Manufacturer <span className="text-red-600">*</span></td>
+                <td className="border border-gray-300 p-2">
+                  <div className="w-full p-1 border rounded bg-gray-100 text-gray-800">{formData.manufacturer}</div>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Customer</td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="text"
+                    name="customer"
+                    value={formData.customer}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="(Optional)"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Number of Transformers <span className="text-red-600">*</span></td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="number"
+                    name="numberOfTransformers"
+                    value={formData.numberOfTransformers}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    placeholder="Enter number of transformers"
+                  />
+                  {errors.numberOfTransformers && <div className="text-red-600 text-xs mt-1">{errors.numberOfTransformers}</div>}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Transformer MVA <span className="text-red-600">*</span></td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="number"
+                    name="transformerMVA"
+                    value={formData.transformerMVA}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    step="any"
+                  />
+                  {errors.transformerMVA && <div className="text-red-600 text-xs mt-1">{errors.transformerMVA}</div>}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Primary Voltage (kV)<span className="text-red-600">*</span></td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="number"
+                    name="primaryVoltage"
+                    value={formData.primaryVoltage}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    step="any"
+                  />
+                  {errors.primaryVoltage && <div className="text-red-600 text-xs mt-1">{errors.primaryVoltage}</div>}
+                  
+                  {/* Conditionally rendered BIL dropdown */}
+                  {hvBilChoices && (
+                    <div className="mt-2">
+                      <label className="block text-xs text-gray-700 mb-1">Select Lightning Impulse (BIL) for HV:</label>
+                      <select
+                        value={selectedHvBil ? selectedHvBil.impulse : ''}
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          setSelectedHvBil(hvBilChoices.find(opt => opt.impulse === val));
+                        }}
+                        className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select BIL (Default)</option>
+                        {hvBilChoices.map(opt => (
+                          <option key={opt.impulse} value={opt.impulse}>{opt.impulse} kVp</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold"> No. of Phases</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['1', '2', '3']}
+                    value={formData.noOfPhasesPrimary}
+                    onChange={newValue => handleInputChange({ target: { name: 'noOfPhasesPrimary', value: newValue } })}
+                    placeholder="Enter Number of Phases"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold"> Frequency(in Hz)</td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="number"
+                    name="frequency"
+                    value={formData.frequency}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold"> Connection</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={[ 'Delta', 'Star', 'Zig-Zag','Star with Neutral','Auto' ]}
+                    value={formData.connectionPrimary}
+                    onChange={newValue => handleInputChange({ target: { name: 'connectionPrimary', value: newValue } })}
+                    placeholder="Enter Connection"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 align-top font-bold py-4">
+                  <span className="text-l">Secondary Winding Particulars</span> <span className="text-red-600">*</span>
+                  <br /><br /><div className="mt-12 space-y-6">
+                    <div>a) Terminal Voltage - kV</div>
+                    <div>b) Rated kVA</div>
+                    <div>c) No. of Phases</div>
+                    <div>d) Vector Group</div>
+                    <div>e) Phase difference</div>
+                  </div>
+                </td>
+                <td className="border border-gray-300 p-2 align-top">
+                  <div className="mb-4">
+                <label className="font-semibold">Secondary Winding Configuration:</label>
+                <div className="flex gap-4 mt-2">
+                  {['single', 'two', 'four'].map(config => (
+                    <label key={config} className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        name="secondaryConfig"
+                        value={config}
+                        checked={secondaryWindingConfig === config}
+                        onChange={() => setSecondaryWindingConfig(config)}
+                        className="form-radio h-5 w-5 text-blue-600"
+                      />
+                      <span className="ml-2 capitalize">
+                        {config === 'single' && 'Single Secondary'}
+                        {config === 'two' && 'Two Secondaries'}
+                        {config === 'four' && 'Four Secondaries'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+                  {secondaryWindingConfig === 'single' ? (
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-blue-50">
+                          <th className="border p-1">Secondary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td className="border p-1"><input type="number" name="secondaryVoltage" value={formData.secondaryVoltage} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Voltage (kV)" step="any" />{errors.secondaryVoltage && <div className="text-red-600 text-xs mt-1">{errors.secondaryVoltage}</div>}
+                          {lv1BilChoices_single && (
+  <div className="mt-2">
+    <label className="block text-xs text-gray-700 mb-1">Select BIL for LV:</label>
+    <select
+      value={selectedLv1Bil ? selectedLv1Bil.impulse : ''}
+      onChange={e => {
+        const val = parseInt(e.target.value);
+        setSelectedLv1Bil(lv1BilChoices_single.find(opt => opt.impulse === val));
+      }}
+      className="w-full p-1 border rounded"
+    >
+      <option value="">Select BIL (Default)</option>
+      {lv1BilChoices_single.map(opt => (
+        <option key={opt.impulse} value={opt.impulse}>{opt.impulse} kVp</option>
+      ))}
+    </select>
+  </div>
+)}</td></tr>
+                        <tr><td className="border p-1"><input type="number" name="secondaryKVA" value={formData.secondaryKVA} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="kVA" step="any" />{errors.secondaryKVA && <div className="text-red-600 text-xs mt-1">{errors.secondaryKVA}</div>}</td></tr>
+                        <tr><td className="border p-1"><MultiSelectComboBox options={['1', '2', '3']} value={formData.secondaryPhases} onChange={newValue => handleInputChange({ target: { name: 'secondaryPhases', value: newValue } })} placeholder="Phases" /></td></tr>
+                        <tr><td className="border p-1"><MultiSelectComboBox options={['Delta', 'Star', 'Zig-Zag', 'Star with Neutral', 'Auto']} value={formData.secondaryConnection} onChange={newValue => handleInputChange({ target: { name: 'secondaryConnection', value: newValue } })} placeholder="Connection" /></td></tr>
+                        <tr><td className="border p-1"><input type="text" name="secondaryPhaseDifference" value={formData.secondaryPhaseDifference} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Phase difference" /></td></tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-blue-50">
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && <th className="border p-1">Secondary-1</th>}
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && <th className="border p-1">Secondary-2</th>}
+                          {secondaryWindingConfig === 'four' && <th className="border p-1">Secondary-3</th>}
+                          {secondaryWindingConfig === 'four' && <th className="border p-1">Secondary-4</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                            <>
+                              <td className="border p-1"><input type="number" name="secondary1Voltage" value={formData.secondary1Voltage} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Voltage (kV)" step="any" />{errors.secondary1Voltage && <div className="text-red-600 text-xs mt-1">{errors.secondary1Voltage}</div>}{lv1BilChoices_multi && (
+  <div className="mt-2"><select value={selectedLv1Bil?.impulse || ''} onChange={e => setSelectedLv1Bil(lv1BilChoices_multi.find(o=>o.impulse==parseInt(e.target.value)))} className="w-full p-1 border rounded text-xs"><option value="">Select BIL</option>{lv1BilChoices_multi.map(o=><option key={o.impulse} value={o.impulse}>{o.impulse} kVp</option>)}</select></div>
+)}</td>
+                              <td className="border p-1"><input type="number" name="secondary2Voltage" value={formData.secondary2Voltage} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Voltage (kV)" step="any" />{errors.secondary2Voltage && <div className="text-red-600 text-xs mt-1">{errors.secondary2Voltage}</div>}{lv2BilChoices_multi && (
+  <div className="mt-2"><select value={selectedLv2Bil?.impulse || ''} onChange={e => setSelectedLv2Bil(lv2BilChoices_multi.find(o=>o.impulse==parseInt(e.target.value)))} className="w-full p-1 border rounded text-xs"><option value="">Select BIL</option>{lv2BilChoices_multi.map(o=><option key={o.impulse} value={o.impulse}>{o.impulse} kVp</option>)}</select></div>
+)}</td>
+                            </>
+                          )}
+                          {secondaryWindingConfig === 'four' && (
+                            <>
+                              <td className="border p-1"><input type="number" name="secondary3Voltage" value={formData.secondary3Voltage} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Voltage (kV)" step="any" />{errors.secondary3Voltage && <div className="text-red-600 text-xs mt-1">{errors.secondary3Voltage}</div>}{lv3BilChoices_multi && (
+  <div className="mt-2"><select value={selectedLv3Bil?.impulse || ''} onChange={e => setSelectedLv3Bil(lv3BilChoices_multi.find(o=>o.impulse==parseInt(e.target.value)))} className="w-full p-1 border rounded text-xs"><option value="">Select BIL</option>{lv3BilChoices_multi.map(o=><option key={o.impulse} value={o.impulse}>{o.impulse} kVp</option>)}</select></div>
+)}</td>
+                              <td className="border p-1"><input type="number" name="secondary4Voltage" value={formData.secondary4Voltage} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Voltage (kV)" step="any" />{errors.secondary4Voltage && <div className="text-red-600 text-xs mt-1">{errors.secondary4Voltage}</div>}{lv4BilChoices_multi && (
+  <div className="mt-2"><select value={selectedLv4Bil?.impulse || ''} onChange={e => setSelectedLv4Bil(lv4BilChoices_multi.find(o=>o.impulse==parseInt(e.target.value)))} className="w-full p-1 border rounded text-xs"><option value="">Select BIL</option>{lv4BilChoices_multi.map(o=><option key={o.impulse} value={o.impulse}>{o.impulse} kVp</option>)}</select></div>
+)}</td>
+                            </>
+                          )}
+                        </tr>
+                        <tr>
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                            <>
+                              <td className="border p-1"><input type="number" name="secondary1KVA" value={formData.secondary1KVA} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="kVA" step="any" />{errors.secondary1KVA && <div className="text-red-600 text-xs mt-1">{errors.secondary1KVA}</div>}</td>
+                              <td className="border p-1"><input type="number" name="secondary2KVA" value={formData.secondary2KVA} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="kVA" step="any" />{errors.secondary2KVA && <div className="text-red-600 text-xs mt-1">{errors.secondary2KVA}</div>}</td>
+                            </>
+                          )}
+                          {secondaryWindingConfig === 'four' && (
+                            <>
+                              <td className="border p-1"><input type="number" name="secondary3KVA" value={formData.secondary3KVA} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="kVA" step="any" />{errors.secondary3KVA && <div className="text-red-600 text-xs mt-1">{errors.secondary3KVA}</div>}</td>
+                              <td className="border p-1"><input type="number" name="secondary4KVA" value={formData.secondary4KVA} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="kVA" step="any" />{errors.secondary4KVA && <div className="text-red-600 text-xs mt-1">{errors.secondary4KVA}</div>}</td>
+                            </>
+                          )}
+                        </tr>
+                        <tr>
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                            <>
+                              <td className="border p-1"><MultiSelectComboBox options={['1', '2', '3']} value={formData.secondary1Phases} onChange={newValue => handleInputChange({ target: { name: 'secondary1Phases', value: newValue } })} placeholder="Phases" /></td>
+                              <td className="border p-1"><MultiSelectComboBox options={['1', '2', '3']} value={formData.secondary2Phases} onChange={newValue => handleInputChange({ target: { name: 'secondary2Phases', value: newValue } })} placeholder="Phases" /></td>
+                            </>
+                          )}
+                          {secondaryWindingConfig === 'four' && (
+                            <>
+                              <td className="border p-1"><MultiSelectComboBox options={['1', '2', '3']} value={formData.secondary3Phases} onChange={newValue => handleInputChange({ target: { name: 'secondary3Phases', value: newValue } })} placeholder="Phases" /></td>
+                              <td className="border p-1"><MultiSelectComboBox options={['1', '2', '3']} value={formData.secondary4Phases} onChange={newValue => handleInputChange({ target: { name: 'secondary4Phases', value: newValue } })} placeholder="Phases" /></td>
+                            </>
+                          )}
+                        </tr>
+                        <tr>
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                            <>
+                              <td className="border p-1"><MultiSelectComboBox options={['Delta', 'Star', 'Zig-Zag', 'Star with Neutral', 'Auto']} value={formData.secondary1Connection} onChange={newValue => handleInputChange({ target: { name: 'secondary1Connection', value: newValue } })} placeholder="Connection" /></td>
+                              <td className="border p-1"><MultiSelectComboBox options={['Delta', 'Star', 'Zig-Zag', 'Star with Neutral', 'Auto']} value={formData.secondary2Connection} onChange={newValue => handleInputChange({ target: { name: 'secondary2Connection', value: newValue } })} placeholder="Connection" /></td>
+                            </>
+                          )}
+                          {secondaryWindingConfig === 'four' && (
+                            <>
+                              <td className="border p-1"><MultiSelectComboBox options={['Delta', 'Star', 'Zig-Zag', 'Star with Neutral', 'Auto']} value={formData.secondary3Connection} onChange={newValue => handleInputChange({ target: { name: 'secondary3Connection', value: newValue } })} placeholder="Connection" /></td>
+                              <td className="border p-1"><MultiSelectComboBox options={['Delta', 'Star', 'Zig-Zag', 'Star with Neutral', 'Auto']} value={formData.secondary4Connection} onChange={newValue => handleInputChange({ target: { name: 'secondary4Connection', value: newValue } })} placeholder="Connection" /></td>
+                            </>
+                          )}
+                        </tr>
+                        <tr>
+                          {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                            <>
+                              <td className="border p-1"><input type="text" name="secondary1PhaseDifference" value={formData.secondary1PhaseDifference} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Phase difference" /></td>
+                              <td className="border p-1"><input type="text" name="secondary2PhaseDifference" value={formData.secondary2PhaseDifference} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Phase difference" /></td>
+                            </>
+                          )}
+                          {secondaryWindingConfig === 'four' && (
+                            <>
+                              <td className="border p-1"><input type="text" name="secondary3PhaseDifference" value={formData.secondary3PhaseDifference} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Phase difference" /></td>
+                              <td className="border p-1"><input type="text" name="secondary4PhaseDifference" value={formData.secondary4PhaseDifference} onChange={handleInputChange} className="w-full p-1 border rounded" placeholder="Phase difference" /></td>
+                            </>
+                          )}
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Impedance Voltage % <span className="text-red-600">*</span></td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="number"
+                    name="impedanceVoltage"
+                    value={formData.impedanceVoltage}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    step="any"
+                  />
+                  {errors.impedanceVoltage && <div className="text-red-600 text-xs mt-1">{errors.impedanceVoltage}</div>}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Tapping Range</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['+5% to -5% in step of 2.5%']}
+                    value={formData.tappingRange}
+                    onChange={newValue => handleInputChange({ target: { name: 'tappingRange', value: newValue } })}
+                    placeholder="Enter or select Tapping Range"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Tap Changer Details</td>
+                <td className="border border-gray-300 p-2 ">
+                  a) Type of Tap Changer
+                  <MultiSelectComboBox
+                    options={['On Load Tap Changer(OLTC)', 'Off Circuit Tap Changer(OCTC)']}
+                    value={formData.tapChangerType}
+                    onChange={newValue => handleInputChange({ target: { name: 'tapChangerType', value: newValue } })}
+                    placeholder="Enter or select Tap Changer Type"
+                  />
+                  <br /><br />
+                  b) Controls of Tap Changer 
+                  <input
+                    type="text"
+                    name="tapChangerControl"
+                    value={formData.tapChangerControl}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  /><br /><br />
+                  c) Taps/Steps on H.V. Winding
+                  <input
+                    type="text"
+                    name="tapsStepsHV"
+                    value={formData.tapsStepsHV}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Vector Group</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['Dyn11', 'Dd0','Dd6','Dzn0','YNyn0','Ya0','YNd11','YNd1']}
+                    value={formData.vectorGroup}
+                    onChange={newValue => handleInputChange({ target: { name: 'vectorGroup', value: newValue } })}
+                    placeholder="Enter or select Vector Group"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Temp. Rise over ambient temp </td>
+                <td className="border border-gray-300 p-2">
+                  a) Ambient: <input
+                    type="number"
+                    name="ambientTempRise"
+                    value={formData.ambientTempRise}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    placeholder="°C"
+                    step="any"/>
+                  b) Oil: <input
+                    type="number"
+                    name="oilTempRise"
+                    value={formData.oilTempRise}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-1"
+                    placeholder="°C"
+                    step="any"
+                  />
+                  {errors.oilTempRise && <div className="text-red-600 text-xs mt-1">{errors.oilTempRise}</div>}<br />
+                  c) Winding: <input
+                    type="number"
+                    name="windingTempRise"
+                    value={formData.windingTempRise}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="°C"
+                    step="any"
+                  />
+                  {errors.windingTempRise && <div className="text-red-600 text-xs mt-1">{errors.windingTempRise}</div>}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Type of Cooling</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['ONAN', 'OFWF', 'OFAF', 'ONAF', 'AN', 'ANAF']}
+                    value={formData.coolingType}
+                    onChange={newValue => handleInputChange({ target: { name: 'coolingType', value: newValue } })}
+                    placeholder="Enter or select Cooling Type"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Installation</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['Outdoor','Indoor']}
+                    value={formData.installation}
+                    onChange={newValue => handleInputChange({ target: { name: 'installation', value: newValue } })}
+                    placeholder="Enter or select Installation"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Component Losses (Subject to IS Tolerance)</td>
+                <td className="border border-gray-300 p-2">
+                  a) No Load Losses at Rated Voltage & Frequency (kW): 
+<div className="flex items-center gap-2">
+  <input
+    type="number"
+    name="noLoadLoss"
+    value={formData.noLoadLoss}
+    onChange={handleInputChange}
+    className="flex-1 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    step="any"
+  />
+  <div className="flex items-center gap-1">
+    <span className="text-sm">As per:</span>
+    <select
+      name="lossStandard1"
+      value={formData.lossStandard1}
+      onChange={handleInputChange}
+      className="p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-normal"
+    >
+      <option value="IS 2026">IS 2026</option>
+      <option value="IEC">IEC</option>
+    </select>
+  </div>
+</div>
+                  {errors.noLoadLoss && <div className="text-red-600 text-xs mt-1">{errors.noLoadLoss}</div>}<br />
+b) Load Losses at F.L. at 75°C (kW):
+<div className="flex items-center gap-2">
+  <input
+    type="number"
+    name="loadLoss"
+    value={formData.loadLoss}
+    onChange={handleInputChange}
+    className="flex-1 p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    step="any"
+  />
+  <div className="flex items-center gap-1">
+    <span className="text-sm">As per:</span>
+    <select
+      name="lossStandard2"
+      value={formData.lossStandard2}
+      onChange={handleInputChange}
+      className="flex-1p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-normal"
+    >
+      <option value="IS 2026">IS 2026</option>
+      <option value="IEC">IEC</option>
+    </select>
+  </div>
+</div>
+                  {errors.loadLoss && <div className="text-red-600 text-xs mt-1">{errors.loadLoss}</div>}
+                  c) Total Losses at F.L. at 75°C (kW): <input
+                    type="text"
+                    name="totalLoss"
+                    value={((parseFloat(formData.noLoadLoss) || 0) + (parseFloat(formData.loadLoss) || 0)).toFixed(2)}
+                    readOnly
+                    className="w-full p-1 border rounded bg-gray-100 text-gray-800 focus:outline-none"
+                    step="any"
+                  />
+                  {errors.loadLoss && <div className="text-red-600 text-xs mt-1">{errors.loadLoss}</div>}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Insulation Class</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['A', 'H','F']}
+                    value={formData.insulationClass}
+                    onChange={newValue => handleInputChange({ target: { name: 'insulationClass', value: newValue } })}
+                    placeholder="Enter or select Insulation Class"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Terminal arrangement</td>
+                <td className="border border-gray-300 p-2 space-y-2">
+                  <div>
+                    a) High voltage:            
+                    <MultiSelectComboBox
+                      options={[ 'Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                      value={formData.terminalHV}
+                      onChange={newValue => handleInputChange({ target: { name: 'terminalHV', value: newValue } })}
+                      placeholder="Enter or select Terminal HV"
+                    />
+                  </div>
+
+                  {/* MODIFICATION: Dynamic LV terminal inputs */}
+                  {secondaryWindingConfig === 'single' && (
+                    <div>
+                      b) Lower voltage:
+                      <MultiSelectComboBox
+                        options={[ 'Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                        value={formData.terminalLV1}
+                        onChange={newValue => handleInputChange({ target: { name: 'terminalLV1', value: newValue } })}
+                        placeholder="Enter or select Terminal LV"
+                      />
+                    </div>
+                  )}
+                  {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                    <div>
+                      b) Lower voltage - 1:
+                      <MultiSelectComboBox
+                        options={['Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                        value={formData.terminalLV1}
+                        onChange={newValue => handleInputChange({ target: { name: 'terminalLV1', value: newValue } })}
+                        placeholder="Enter or select Terminal LV-1"
+                      />
+                    </div>
+                  )}
+                  {(secondaryWindingConfig === 'two' || secondaryWindingConfig === 'four') && (
+                    <div>
+                      c) Lower voltage - 2:
+                      <MultiSelectComboBox
+                        options={['Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                        value={formData.terminalLV2}
+                        onChange={newValue => handleInputChange({ target: { name: 'terminalLV2', value: newValue } })}
+                        placeholder="Enter or select Terminal LV-2"
+                      />
+                    </div>
+                  )}
+                  {secondaryWindingConfig === 'four' && (
+                    <div>
+                      d) Lower voltage - 3:
+                      <MultiSelectComboBox
+                        options={['Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                        value={formData.terminalLV3}
+                        onChange={newValue => handleInputChange({ target: { name: 'terminalLV3', value: newValue } })}
+                        placeholder="Enter or select Terminal LV-3"
+                      />
+                    </div>
+                  )}
+                  {secondaryWindingConfig === 'four' && (
+                    <div>
+                      e) Lower voltage - 4:
+                      <MultiSelectComboBox
+                        options={['Bare Bushing','Bus Duct', 'Cable Box','Bare bushing suitable for accepting bus bar']}
+                        value={formData.terminalLV4}
+                        onChange={newValue => handleInputChange({ target: { name: 'terminalLV4', value: newValue } })}
+                        placeholder="Enter or select Terminal LV-4"
+                      />
+                    </div>
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Transformer oil</td>
+                <td className="border border-gray-300 p-2">
+                  <input
+                    type="text"
+                    name="transformerOil"
+                    value={formData.transformerOil}
+                    onChange={handleInputChange}
+                    className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., As per IS 335"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Paint, Enamel</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['631-Light grey(as per IS:5)', '632- Dark Grey', 'RAL 7032', 'Customize']}
+                    value={formData.paintEnamel}
+                    onChange={newValue => handleInputChange({ target: { name: 'paintEnamel', value: newValue } })}
+                    placeholder="Enter or select Paint"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-gray-300 p-2 font-bold">{indexInput++}</td>
+                <td className="border border-gray-300 p-2 font-bold">Reference Standards</td>
+                <td className="border border-gray-300 p-2">
+                  <MultiSelectComboBox
+                    options={['IS 2026', 'IEC']}
+                    value={formData.referenceStandards}
+                    onChange={newValue => handleInputChange({ target: { name: 'referenceStandards', value: newValue } })}
+                    placeholder="Enter or select Reference Standards"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="mt-4">
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                className="form-checkbox h-5 w-5 text-blue-600"
+                checked={editFittings}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setEditFittings(checked);
+                  if (checked) {
+                    setSelectedFittings(allStandardFittings);
+                  } else {
+                    setSelectedFittings(allStandardFittings);
+                  }
+                }}
+              />
+              <span className="ml-2 text-gray-700">Edit list of Fittings/Accessories</span>
+            </label>
+          </div>
+{editFittings && (
+  <div className="mt-4 p-4 border rounded-lg max-h-96 overflow-y-auto bg-gray-50">
+    <div className="font-semibold mb-2">Select Standard Fittings/Accessories:</div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {allStandardFittings.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selectedFittings.includes(item)}
+            onChange={() => {
+              if (selectedFittings.includes(item)) {
+                setSelectedFittings(selectedFittings.filter(f => f !== item));
+              } else {
+                setSelectedFittings([...selectedFittings, item]);
+              }
+            }}
+            className="mr-2"
+          />
+          <span className="flex-1">{item}</span>
+          {selectedFittings.includes(item) && (
+            <input
+              type="number"
+              min={1}
+              value={fittingQuantities[item] || 1}
+              onChange={e => {
+                const val = Math.max(1, parseInt(e.target.value) || 1);
+                setFittingQuantities(q => ({ ...q, [item]: val }));
+              }}
+              className="w-16 p-1 border rounded"
+            />
+          )}
+        </div>
+      ))}
+    </div>
+    
+    {/* Show terminal-derived fittings with editable quantities */}
+    {terminalFittings.length > 0 && (
+      <>
+        <div className="font-semibold mt-4 mb-2 text-blue-700">
+          Auto-Added from Terminal Selection:
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {terminalFittings.map((item, idx) => {
+            const startIdx = (report.selectedFittings?.length || allStandardFittings.length);
+            return (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={true}
+                  disabled
+                  className="mr-2"
+                />
+                <span className="flex-1 text-blue-700">{item}</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={terminalFittingQuantities[item] || 1}
+                  onChange={e => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    setTerminalFittingQuantities(q => ({ ...q, [item]: val }));
+                  }}
+                  className="w-16 p-1 border rounded border-blue-300"
+                  title="Edit quantity"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </>
+    )}
+  </div>
+)}
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-blue-600"
+                  checked={showAdditionalFittings}
+                  onChange={e => setShowAdditionalFittings(e.target.checked)}
+                />
+                <span className="ml-2 text-gray-700">Enter Additional Fittings/Accessories</span>
+              </label>
+            </div>
+            {showAdditionalFittings && (
+              <div className="mt-4 p-4 border rounded-lg">
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newFitting}
+                    onChange={e => setNewFitting(e.target.value)}
+                    placeholder="Enter fitting/accessory"
+                    className="flex-1 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={newFittingQty}
+                    onChange={e => setNewFittingQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 p-2 border rounded"
+                    placeholder="Qty"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newFitting.trim()) {
+                        setAdditionalFittings(prev => [...prev, { desc: newFitting.trim(), qty: newFittingQty }]);
+                        setNewFitting('');
+                        setNewFittingQty(1);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {additionalFittings.map((fitting, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <span>{fitting.desc}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={fitting.qty}
+                        onChange={e => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                          setAdditionalFittings(prev => prev.map((f, i) => i === index ? { ...f, qty: val } : f));
+                        }}
+                        className="w-16 ml-2 p-1 border rounded"
+                      />
+                      <button
+                        onClick={() => setAdditionalFittings(prev => prev.filter((_, i) => i !== index))}
+                        className="text-red-600 hover:text-red-800 ml-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mt-4">
+            <label className="inline-flex items-center">
+              <input
+                type="checkbox"
+                className="form-checkbox h-5 w-5 text-blue-600"
+                checked={showAdditionalDetails}
+                onChange={e => setShowAdditionalDetails(e.target.checked)}
+              />
+              <span className="ml-2 text-gray-700">Enter Additional Weight/Dimensions</span>
+            </label>
+          </div>
+          {showAdditionalDetails && (
+            <table className="w-full border-collapse border border-gray-300 text-sm mt-4">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-4">Sr. No.</th>
+                  <th className="border border-gray-300 p-4">Description</th>
+                  <th className="border border-gray-300 p-4">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-4 font-bold">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Dimensions <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    a) Length (mm): <input type="text" name="length" value={formData.length} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <br />
+                    b) Width (mm): <input type="text" name="width" value={formData.width} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <br />
+                    c) Height (mm): <input type="text" name="height" value={formData.height} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-4 font-bold">{indexInput++}</td>
+                  <td className="border border-gray-300 p-4 font-bold">Weight Details <span className="text-red-600">*</span></td>
+                  <td className="border border-gray-300 p-4">
+                    a) Core & Windings (kg): <input type="text" name="coreWindingsWeight" value={formData.coreWindingsWeight} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <br />
+                    b) Tank & Fittings (kg): <input type="text" name="tankFittingsWeight" value={formData.tankFittingsWeight} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <br />
+                    c) Oil Mass (kg): <input type="text" name="oilMass" value={formData.oilMass} onChange={handleInputChange} className="w-full p-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <br />
+                    d) Total Weight (kg): <input type="text" value={formData.totalWeight} readOnly className="w-full p-1 border rounded bg-gray-100 text-gray-800 focus:outline-none" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+          <button
+            onClick={calculateEfficiencies}
+            className="mt-4 w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 transition"
+          >
+            See Final Report
+          </button>
+        </div>
+
+        {/* Report Section */}
+        {report && (
+          <div id="report-section" className="bg-white p-6 justify-center rounded-lg shadow-md mt-6 relative">
+            <div className="flex justify-center mb-4">
+                <img
+                    src="https://images.squarespace-cdn.com/content/v1/67c6cd6aa7237560f57b1238/5dc6f094-8e85-4639-9c96-e5aa5e773ec0/BCS-Mahati-with-C_TM-revised-02.png?format=1500w"
+                    alt="Company Logo"
+                    className="h-20 max-w-full object-contain"
+                />
+            </div>
+            {registerOutput && (
+              <div className="absolute top-0 right-0 text-2xl font-bold text-blue-700" style={{ right: '24px', top: '24px' }}>
+                REV -{registerOutput}
+              </div>
+            )}
+            <h2 className="text-xl justify-center font-bold mb-4 text-center">
+              ANNEXURE – {report.annexureNumber || 'I'}
+            </h2>
+            <h3 className="text-lg font-semibold mb-4 text-center">
+              TECHNICAL PARTICULARS FOR {report.transformerMVA} MVA, {report.primaryVoltage} KV /
+                      {[ // Dynamically create the voltage string
+                        report.secondaryWindingConfig === 'single' && report.secondaryVoltage,
+                        (report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && report.secondary1Voltage,
+                        (report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && report.secondary2Voltage,
+                        report.secondaryWindingConfig === 'four' && report.secondary3Voltage,
+                        report.secondaryWindingConfig === 'four' && report.secondary4Voltage
+                      ].filter(Boolean).join('-')} VOLTS CONVERTER DUTY TRANSFORMER 
+            </h3>
+            <table className="w-full border-collapse border border-gray-300 text-sm">
+              <thead>
+                <tr className="bg-blue-100">
+                  <th className="border border-gray-300 p-2">Sr. No.</th>
+                  <th className="border border-gray-300 p-2">Description</th>
+                  <th className="border border-gray-300 p-2">Particulars</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Name of the Manufacturer</td>
+                  <td className="border border-gray-300 p-2">{report.manufacturer}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Customer</td>
+                  <td className="border border-gray-300 p-2">{report.customer || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Number of Transformers</td>
+                  <td className="border border-gray-300 p-2">{report.numberOfTransformers}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Transformer MVA</td>
+                  <td className="border border-gray-300 p-2">{report.transformerMVA} MVA</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Primary Voltage</td>
+                  <td className="border border-gray-300 p-2">{report.primaryVoltage} kV</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">No. of Phases</td>
+                  <td className="border border-gray-300 p-2">{report.noOfPhasesPrimary.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Frequency</td>
+                  <td className="border border-gray-300 p-2">{report.frequency ? `${report.frequency} Hz` : '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Connection</td>
+                  <td className="border border-gray-300 p-2">{report.connectionPrimary.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">
+                    Secondary Winding<br />
+                    a) Terminal Voltage - kV<br />
+                    b) Rated kVA<br />
+                    c) No. of Phases<br />
+                    d) Vector Group<br />
+                    e) Phase difference
+                  </td>
+                  <td className="border border-gray-300 p-2">
+                    {report.secondaryWindingConfig === 'single' ? (
+                      <div><br />
+                        {report.secondaryVoltage} kV<br />
+                        {report.secondaryKVA} kVA<br />
+                        {report.secondaryPhases.join(', ') || '-'}<br />
+                        {report.secondaryConnection.join(', ') || '-'}<br />
+                        {report.secondaryPhaseDifference || '-'}
+                      </div>
+                    ) : (
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-blue-50">
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <th className="border p-1">Secondary-1</th>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <th className="border p-1">Secondary-2</th>}
+                            {report.secondaryWindingConfig === 'four' && <th className="border p-1">Secondary-3</th>}
+                            {report.secondaryWindingConfig === 'four' && <th className="border p-1">Secondary-4</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary1Voltage} kV</td>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary2Voltage} kV</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary3Voltage} kV</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary4Voltage} kV</td>}
+                          </tr>
+                          <tr>
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary1KVA} kVA</td>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary2KVA} kVA</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary3KVA} kVA</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary4KVA} kVA</td>}
+                          </tr>
+                          <tr>
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary1Phases.join(', ') || '-'}</td>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary2Phases.join(', ') || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary3Phases.join(', ') || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary4Phases.join(', ') || '-'}</td>}
+                          </tr>
+                          <tr>
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary1Connection.join(', ') || '-'}</td>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary2Connection.join(', ') || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary3Connection.join(', ') || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary4Connection.join(', ') || '-'}</td>}
+                          </tr>
+                          <tr>
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary1PhaseDifference || '-'}</td>}
+                            {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <td className="border p-1">{report.secondary2PhaseDifference || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary3PhaseDifference || '-'}</td>}
+                            {report.secondaryWindingConfig === 'four' && <td className="border p-1">{report.secondary4PhaseDifference || '-'}</td>}
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Primary Line Current<br />Secondary Line Current Full Load Rated Current</td>
+                  <td className="border border-gray-300 p-2">
+                    HV: {report.hvCurrent ? `${report.hvCurrent} Amps` : '-'}<br />
+                    {report.secondaryWindingConfig === 'single' && (
+                      <>LV: {report.lvCurrents && report.lvCurrents[0] ? `${report.lvCurrents[0]} Amps` : '-'}<br /></>
+                    )}
+                    {/* FIX APPLIED HERE for display */}
+                    {report.secondaryWindingConfig === 'two' && (
+                      <>
+                        LV1: {report.lvCurrents && report.lvCurrents[0] ? `${report.lvCurrents[0]} Amps` : '-'}<br />
+                        LV2: {report.lvCurrents && report.lvCurrents[1] ? `${report.lvCurrents[1]} Amps` : '-'}<br />
+                      </>
+                    )}
+                    {report.secondaryWindingConfig === 'four' && (
+                      <>
+                        LV1: {report.lvCurrents && report.lvCurrents[0] ? `${report.lvCurrents[0]} Amps` : '-'}<br />
+                        LV2: {report.lvCurrents && report.lvCurrents[1] ? `${report.lvCurrents[1]} Amps` : '-'}<br />
+                        LV3: {report.lvCurrents && report.lvCurrents[2] ? `${report.lvCurrents[2]} Amps` : '-'}<br />
+                        LV4: {report.lvCurrents && report.lvCurrents[3] ? `${report.lvCurrents[3]} Amps` : '-'}
+                      </>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Impedance Voltage %</td>
+                  <td className="border border-gray-300 p-2">{report.impedanceVoltage ? `${report.impedanceVoltage}%` : '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Tapping Range</td>
+                  <td className="border border-gray-300 p-2">{report.tappingRange.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Tap Changer Details</td>
+                  <td className="border border-gray-300 p-2">
+                    a) Type of Tap Changer: {report.tapChangerType.join(', ') || '-'}<br />
+                    b) Controls of Tap Changer: {report.tapChangerControl || '-'}<br />
+                    c) Taps/Steps on H.V. Winding: {report.tapsStepsHV || '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Vector Group</td>
+                  <td className="border border-gray-300 p-2">{report.vectorGroup.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Temp. Rise over Ambient Temp</td>
+                  <td className="border border-gray-300 p-2">
+                    a) Ambient: {report.ambientTempRise ? `${report.ambientTempRise} °C` : '-'}<br />
+                    b) Oil: {report.oilTempRise ? `${report.oilTempRise} °C` : '-'}<br />
+                    c) Winding: {report.windingTempRise ? `${report.windingTempRise} °C` : '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Type of Cooling</td>
+                  <td className="border border-gray-300 p-2">{report.coolingType.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Installation</td>
+                  <td className="border border-gray-300 p-2">{report.installation.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Component Losses (Subject to {report.lossStandard} IS Tolerance)</td>
+                  <td className="border border-gray-300 p-2">
+                    a) No Load Losses at Rated Voltage & Frequency(As per {report.lossStandard1} Standard): {report.noLoadLoss ? `${report.noLoadLoss} kW` : '-'} <br />
+                    b) Load Losses at F.L. at 75°C(AS per {report.lossStandard2} Standard): {report.loadLoss ? `${report.loadLoss} kW` : '-'} <br />
+                    c) Total Losses at F.L. at 75°C: {report.totalLoss ? `${report.totalLoss.toFixed(2)} kW` : '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Efficiency</td>
+                  <td className="border border-gray-300 p-2">
+                    <table className="w-full border border-gray-300 text-center">
+                      <thead>
+                        <tr className="bg-blue-50">
+                          <th className="border border-gray-300 p-2">Load</th>
+                          <th className="border border-gray-300 p-2">Unity Power Factor (%)</th>
+                          <th className="border border-gray-300 p-2">0.8 Power Factor (%)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['0.25', '0.5', '0.75', '1', '1.1'].map(load => (
+                          <tr key={load}>
+                            <td className="border border-gray-300 p-2">{load === '1' ? '100% Load' : `${Math.round(load * 100)}% Load`}</td>
+                            <td className="border border-gray-300 p-2">{report.efficiencies.upf[load] || '-'}</td>
+                            <td className="border border-gray-300 p-2">{report.efficiencies.pf08[load] || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Insulation Class</td>
+                  <td className="border border-gray-300 p-2">{report.insulationClass.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Insulation Level</td>
+                  <td className="border border-gray-300 p-2">
+                    <table className="w-full border border-gray-300 text-center">
+                      <thead>
+                        <tr className="bg-blue-50">
+                          <th className="border border-gray-300 p-2">Winding</th>
+                          <th className="border border-gray-300 p-2">Separate Source Voltage (kV)</th>
+                          <th className="border border-gray-300 p-2">Induced Voltage (kV)</th>
+                          <th className="border border-gray-300 p-2">Impulse Voltage (kVp)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-gray-300 p-2">HV</td>
+                          <td className="border border-gray-300 p-2">{report.hvSeparateSourceVoltage || '-'}</td>
+                          <td className="border border-gray-300 p-2">{report.hvInducedVoltage || '-'}</td>
+                          <td className="border border-gray-300 p-2">{report.hvImpulseVoltage || '-'}</td>
+                        </tr>
+                          {report.finalLvBilValues && report.finalLvBilValues.map((bil, index) => (
+                           <tr key={index}>
+                            <td className="border border-gray-300 p-2">LV-{index + 1}</td>
+                           <td className="border border-gray-300 p-2">{bil.powerFreq || '-'}</td>
+                           <td className="border border-gray-300 p-2">{bil.induced || '-'}</td>
+                           <td className="border border-gray-300 p-2">{bil.impulse || '-'}</td>
+                        </tr>
+                      ))}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Terminal Arrangement</td>
+                  <td className="border border-gray-300 p-2">
+                    a) High Voltage: {report.terminalHV.join(', ') || '-'}<br />
+                    {/* MODIFICATION: Dynamic LV terminal display */}
+                    {report.secondaryWindingConfig === 'single' && <>b) Lower voltage: {report.terminalLV1.join(', ') || '-'}</>}
+                    {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <>b) Lower voltage - 1: {report.terminalLV1.join(', ') || '-'}<br/></>}
+                    {(report.secondaryWindingConfig === 'two' || report.secondaryWindingConfig === 'four') && <>c) Lower voltage - 2: {report.terminalLV2.join(', ') || '-'}<br/></>}
+                    {report.secondaryWindingConfig === 'four' && <>d) Lower voltage - 3: {report.terminalLV3.join(', ') || '-'}<br/></>}
+                    {report.secondaryWindingConfig === 'four' && <>e) Lower voltage - 4: {report.terminalLV4.join(', ') || '-'}</>}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Transformer oil</td>
+                  <td className="border border-gray-300 p-2">{report.transformerOil || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Paint, Enamel</td>
+                  <td className="border border-gray-300 p-2">{report.paintEnamel.join(', ') || '-'}</td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+                  <td className="border border-gray-300 p-2 font-bold">Reference Standards</td>
+                  <td className="border border-gray-300 p-2">{report.referenceStandards.join(', ') || '-'}</td>
+                </tr>
+              </tbody>
+              <tr>
+  <td className="border border-gray-300 p-2 font-bold" colSpan="3">
+    <h2 className="text-xl font-bold mt-8 mb-4 text-center page-break">ANNEXURE – II</h2>
+    <h3 className="text-lg font-semibold mb-4 text-center">
+      LIST OF FITTINGS & ACCESSORIES FOR CONVERTER DUTY TRANSFORMER
+    </h3>
+    <table className="w-full border-collapse border border-gray-300 text-sm mb-4">
+      <thead>
+        <tr className="bg-blue-100">
+          <th className="border border-gray-300 p-2">Sr. No.</th>
+          <th className="border border-gray-300 p-2">Description</th>
+          <th className="border border-gray-300 p-2">Quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {/* Standard Fittings */}
+        {(report.selectedFittings && report.selectedFittings.length > 0 
+          ? report.selectedFittings 
+          : allStandardFittings
+        ).map((f, idx) => (
+          <tr key={`standard-${idx}`}>
+            <td className="border border-gray-300 p-2 text-center">{idx + 1}</td>
+            <td className="border border-gray-300 p-2">{f}</td>
+            <td className="border border-gray-300 p-2 text-center">
+              {report.fittingQuantities?.[f] || 1}
+            </td>
+          </tr>
+        ))}
+        
+{/* Terminal-Derived Fittings */}
+{report.terminalFittings && report.terminalFittings.length > 0 && 
+  report.terminalFittings.map((fitting, idx) => {
+    const startIdx = (report.selectedFittings?.length || allStandardFittings.length);
+    return (
+      <tr key={`terminal-${idx}`} className="bg-blue-50">
+        <td className="border border-gray-300 p-2 text-center">{startIdx + idx + 1}</td>
+        <td className="border border-gray-300 p-2">{fitting}</td>
+        <td className="border border-gray-300 p-2 text-center">
+          {report.terminalFittingQuantities?.[fitting] || 1}
+        </td>
+      </tr>
+    );
+  })
+}
+        
+        {/* Additional Fittings */}
+        {report.additionalFittings && report.additionalFittings.length > 0 &&
+          report.additionalFittings.map((item, idx) => {
+            const startIdx = (report.selectedFittings?.length || allStandardFittings.length) 
+                            + (report.terminalFittings?.length || 0);
+            return (
+              <tr key={`additional-${idx}`}>
+                <td className="border border-gray-300 p-2 text-center">{startIdx + idx + 1}</td>
+                <td className="border border-gray-300 p-2">{item.desc}</td>
+                <td className="border border-gray-300 p-2 text-center">{item.qty}</td>
+              </tr>
+            );
+          })
+        }
+      </tbody>
+    </table>
+  </td>
+</tr>
+{showAdditionalDetails && (
+  <>
+    <tr>
+      <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+      <td className="border border-gray-300 p-2 font-bold">Dimensions</td>
+      <td className="border border-gray-300 p-2">
+        a) Length: {report.length ? `${report.length} mm` : '-'}<br />
+        b) Width: {report.width ? `${report.width} mm` : '-'}<br />
+        c) Height: {report.height ? `${report.height} mm` : '-'}
+      </td>
+    </tr>
+    <tr>
+      <td className="border border-gray-300 p-2 font-bold">{indexOutput++}</td>
+      <td className="border border-gray-300 p-2 font-bold">Weight Details</td>
+      <td className="border border-gray-300 p-2">
+        a) Core & Windings: {report.coreWindingsWeight ? `${report.coreWindingsWeight} kg` : '-'}<br />
+        b) Tank & Fittings: {report.tankFittingsWeight ? `${report.tankFittingsWeight} kg` : '-'}<br />
+        c) Oil Mass: {report.oilMass ? `${report.oilMass} kg` : '-'}<br />
+        d) Total Weight: {report.totalWeight ? `${report.totalWeight} kg` : '-'}
+      </td>
+    </tr>
+  </>
+)}
+            </table>
+                    <button
+              onClick={handleDownloadPDF}
+              className="mt-4 w-full bg-green-600 text-white p-3 rounded hover:bg-green-700 transition">
+              Download PDF
+            </button>
+          </div>
+          
+        )}
+        
+
+      </div>
+      
+    );
+  }
+
+  // Render the app
+  root.render(<App />);
+  </script>
+</body>
+</html>
